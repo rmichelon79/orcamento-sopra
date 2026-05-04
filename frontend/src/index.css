@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  color: #1f2937;
+  background: #f9fafb;
+}
+
+.row-actions {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.row-conta-cell:hover .row-actions,
+.ag-row-hover .row-actions,
+.ag-row:hover .row-actions {
+  opacity: 1;
+}
+.action-btn {
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.action-btn:hover {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #1f2937;
+}
+.action-btn-danger:hover {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
