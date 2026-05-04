@@ -1,15 +1,23 @@
-"""Popula o banco com Sopra + plano de contas inicial (3 níveis, ~15 contas).
+"""Popula o banco com 4 empreendimentos da Sopra + plano de contas + orçamento 2026.
 
 Uso:
     python -m app.seed
+
+Idempotente: empreendimentos / contas / orçamentos só são criados se ainda não existem.
 """
 from sqlalchemy import select
 
 from app.database import Base, SessionLocal, engine
 from app.models import Conta, Empreendimento, Orcamento
 
-SEED_EMPREENDIMENTO = {"codigo": "SOPRA", "nome": "Sopra Incorporadora"}
 SEED_ANO = 2026
+
+SEED_EMPREENDIMENTOS = [
+    {"codigo": "ALTANA", "nome": "Altana"},
+    {"codigo": "ARIA", "nome": "Aria"},
+    {"codigo": "BORORO", "nome": "Bororo"},
+    {"codigo": "SOPRA", "nome": "Sopra Incorporadora"},
+]
 
 # Estrutura: (codigo, nome, tipo, natureza, [filhas])
 PLANO_CONTAS: list[tuple] = [
@@ -108,17 +116,23 @@ def _criar_subarvore(db, raizes, parent_id: int | None, nivel: int) -> None:
 def seed() -> None:
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
-        emp = db.execute(
-            select(Empreendimento).where(Empreendimento.codigo == SEED_EMPREENDIMENTO["codigo"])
-        ).scalar_one_or_none()
-        if emp is None:
-            emp = Empreendimento(**SEED_EMPREENDIMENTO, ativo=True)
-            db.add(emp)
-            db.flush()
-            print(f"Empreendimento criado: {emp.codigo} - {emp.nome}")
-        else:
-            print(f"Empreendimento já existia: {emp.codigo} - {emp.nome}")
+        # 1) Empreendimentos
+        criados_emp: list[Empreendimento] = []
+        for emp_data in SEED_EMPREENDIMENTOS:
+            existente = db.execute(
+                select(Empreendimento).where(Empreendimento.codigo == emp_data["codigo"])
+            ).scalar_one_or_none()
+            if existente is None:
+                novo = Empreendimento(**emp_data, ativo=True)
+                db.add(novo)
+                db.flush()
+                criados_emp.append(novo)
+            else:
+                criados_emp.append(existente)
+        db.commit()
+        print(f"Empreendimentos: {len(criados_emp)} ({', '.join(e.codigo for e in criados_emp)}).")
 
+        # 2) Plano de contas (compartilhado)
         existing = db.execute(select(Conta).limit(1)).scalar_one_or_none()
         if existing is None:
             _criar_subarvore(db, PLANO_CONTAS, parent_id=None, nivel=1)
@@ -126,23 +140,34 @@ def seed() -> None:
             total = db.execute(select(Conta)).scalars().all()
             print(f"Plano de contas criado: {len(total)} contas.")
         else:
-            print("Plano de contas já populado.")
+            total = db.execute(select(Conta)).scalars().all()
+            print(f"Plano de contas já populado: {len(total)} contas.")
 
-        orc = db.execute(
-            select(Orcamento).where(
-                Orcamento.empreendimento_id == emp.id,
-                Orcamento.ano == SEED_ANO,
-                Orcamento.versao == 1,
-            )
-        ).scalar_one_or_none()
-        if orc is None:
-            db.add(
-                Orcamento(empreendimento_id=emp.id, ano=SEED_ANO, versao=1, status="rascunho")
-            )
-            db.commit()
-            print(f"Orçamento default criado: {emp.codigo} / {SEED_ANO} / v1.")
-        else:
-            print(f"Orçamento default já existia: {emp.codigo} / {SEED_ANO} / v1.")
+        # 3) Orçamento default por empreendimento (ano = SEED_ANO, versao = 1)
+        criados_orc = 0
+        for emp in criados_emp:
+            existente = db.execute(
+                select(Orcamento).where(
+                    Orcamento.empreendimento_id == emp.id,
+                    Orcamento.ano == SEED_ANO,
+                    Orcamento.versao == 1,
+                )
+            ).scalar_one_or_none()
+            if existente is None:
+                db.add(
+                    Orcamento(
+                        empreendimento_id=emp.id,
+                        ano=SEED_ANO,
+                        versao=1,
+                        status="rascunho",
+                    )
+                )
+                criados_orc += 1
+        db.commit()
+        print(
+            f"Orçamentos {SEED_ANO}/v1: criados {criados_orc} / "
+            f"{len(criados_emp) - criados_orc} já existiam."
+        )
 
 
 if __name__ == "__main__":

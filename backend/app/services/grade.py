@@ -3,8 +3,13 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Conta, Lancamento, Orcamento
-from app.schemas.orcamento import GradeNode, GradeResponse, OrcamentoOut
+from app.models import Conta, Empreendimento, Lancamento, Orcamento
+from app.schemas.orcamento import (
+    GradeConsolidadaResponse,
+    GradeNode,
+    GradeResponse,
+    OrcamentoOut,
+)
 
 ZERO = Decimal("0.00")
 
@@ -101,6 +106,82 @@ def calcular_grade(db: Session, orcamento_id: int) -> GradeResponse:
 
     return GradeResponse(
         orcamento=OrcamentoOut.model_validate(orc),
+        arvore=raizes,
+        totais_mes=totais_mes,
+        total_geral=total_geral,
+    )
+
+
+def calcular_consolidado(
+    db: Session, ano: int, empreendimento_ids: list[int] | None = None
+) -> GradeConsolidadaResponse:
+    """Soma a grade de vários empreendimentos.
+
+    Para cada empreendimento, usa a versão de orçamento mais recente daquele ano.
+    Se um empreendimento não tem orçamento no ano pedido, é silenciosamente ignorado.
+    """
+    if empreendimento_ids is None or len(empreendimento_ids) == 0:
+        # default: todos os empreendimentos ativos
+        empreendimento_ids = [
+            e.id
+            for e in db.execute(
+                select(Empreendimento).where(Empreendimento.ativo.is_(True))
+            ).scalars()
+        ]
+
+    if not empreendimento_ids:
+        raise GradeError("Nenhum empreendimento ativo para consolidar.")
+
+    # Para cada empreendimento, pega a versão mais recente do ano
+    versoes_usadas: dict[int, int] = {}
+    orcamento_ids: list[int] = []
+    incluidos: list[int] = []
+
+    for emp_id in empreendimento_ids:
+        orc = db.execute(
+            select(Orcamento)
+            .where(
+                Orcamento.empreendimento_id == emp_id,
+                Orcamento.ano == ano,
+            )
+            .order_by(Orcamento.versao.desc())
+        ).scalars().first()
+        if orc is None:
+            continue
+        versoes_usadas[emp_id] = orc.versao
+        orcamento_ids.append(orc.id)
+        incluidos.append(emp_id)
+
+    if not orcamento_ids:
+        raise GradeError(
+            f"Nenhum dos empreendimentos solicitados tem orçamento no ano {ano}."
+        )
+
+    contas = list(db.execute(select(Conta).order_by(Conta.ordem)).scalars().all())
+    lancs = db.execute(
+        select(Lancamento).where(Lancamento.orcamento_id.in_(orcamento_ids))
+    ).scalars().all()
+
+    # Soma por (conta_id, mes) através dos vários orçamentos
+    lancamentos_por_conta: dict[tuple[int, int], Decimal] = {}
+    for l in lancs:
+        chave = (l.conta_id, l.mes)
+        lancamentos_por_conta[chave] = lancamentos_por_conta.get(chave, ZERO) + l.valor
+
+    raizes = _montar_arvore(contas, lancamentos_por_conta)
+    for no in raizes:
+        _calcular_subtotais(no)
+
+    totais_mes = _zeros()
+    for raiz in raizes:
+        for m in range(12):
+            totais_mes[m] += raiz.valores[m]
+    total_geral = sum(totais_mes, start=ZERO)
+
+    return GradeConsolidadaResponse(
+        ano=ano,
+        empreendimentos_incluidos=incluidos,
+        versoes_usadas=versoes_usadas,
         arvore=raizes,
         totais_mes=totais_mes,
         total_geral=total_geral,

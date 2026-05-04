@@ -8,10 +8,15 @@ export function useEmpreendimentos() {
   });
 }
 
-export function useOrcamento(empreendimento_id: number | undefined, ano: number) {
+export function useOrcamento(
+  empreendimento_id: number | undefined,
+  ano: number,
+  versao?: number | null,
+) {
   return useQuery({
-    queryKey: ["orcamento", empreendimento_id, ano],
-    queryFn: () => api.buscarOrcamento(empreendimento_id!, ano),
+    queryKey: ["orcamento", empreendimento_id, ano, versao ?? null],
+    queryFn: () =>
+      api.buscarOrcamento(empreendimento_id!, ano, versao ?? undefined),
     enabled: empreendimento_id !== undefined,
   });
 }
@@ -21,5 +26,19 @@ export function useGrade(orcamento_id: number | undefined) {
     queryKey: ["grade", orcamento_id],
     queryFn: () => api.carregarGrade(orcamento_id!),
     enabled: orcamento_id !== undefined,
+  });
+}
+
+export function useGradeConsolidada(
+  ano: number,
+  empreendimento_ids: number[],
+  enabled = true,
+) {
+  // chave estável independente da ordem dos ids
+  const key = [...empreendimento_ids].sort((a, b) => a - b).join(",");
+  return useQuery({
+    queryKey: ["grade-consolidada", ano, key],
+    queryFn: () => api.consolidado(ano, empreendimento_ids),
+    enabled: enabled && empreendimento_ids.length > 0,
   });
 }

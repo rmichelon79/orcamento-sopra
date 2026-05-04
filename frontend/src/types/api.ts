@@ -55,6 +55,22 @@ export interface GradeResponse {
   total_geral: string;
 }
 
+export interface GradeConsolidadaResponse {
+  ano: number;
+  empreendimentos_incluidos: number[];
+  versoes_usadas: Record<string, number>;
+  arvore: GradeNode[];
+  totais_mes: string[];
+  total_geral: string;
+}
+
+export interface VersaoOrcamento {
+  id: number;
+  versao: number;
+  status: StatusOrcamento;
+  criado_em: string;
+}
+
 export interface LancamentoBulkItem {
   conta_id: number;
   mes: number;

@@ -1,10 +1,10 @@
-# Orçamento Sopra — MVP Fase 1
+# Orçamento Sopra — Fases 1 + 2
 
-Camada de planejamento orçamentário para a Sopra Incorporadora: hierarquia de
-contas até 5 níveis, lançamentos mês a mês para um empreendimento, subtotais
-calculados em tempo real, edição com debounce, paste do Excel.
+Camada de planejamento orçamentário com hierarquia de contas até 5 níveis,
+lançamentos mês a mês, multi-empreendimento, consolidação e versionamento.
 
-A spec completa está em [`spec-mvp-fase-1.md`](spec-mvp-fase-1.md).
+- [`spec-mvp-fase-1.md`](spec-mvp-fase-1.md) — fundação (1 empreendimento, edição, CRUD de contas)
+- [`spec-mvp-fase-2.md`](spec-mvp-fase-2.md) — multi-empreendimento, consolidação, versionamento
 
 ## Stack
 
@@ -31,9 +31,9 @@ uvicorn app.main:app --reload
 ```
 
 A primeira execução cria `orcamento.db` e popula automaticamente:
-- Empreendimento `SOPRA`
-- Plano de contas com 23 contas (5 níveis 1, 7 níveis 2, 11 níveis 3)
-- Orçamento default `(SOPRA, 2026, v1)` em status `rascunho`
+- 4 empreendimentos: `ALTANA`, `ARIA`, `BORORO`, `SOPRA`
+- Plano de contas com 23 contas (5 níveis 1, 7 níveis 2, 11 níveis 3) — compartilhado
+- 4 orçamentos `(empreendimento, 2026, v1)` em status `rascunho`, sem lançamentos
 
 API disponível em <http://127.0.0.1:8000> · Swagger em `/docs`.
 
@@ -56,7 +56,8 @@ cd backend
 .venv/bin/pytest -v
 ```
 
-11 testes cobrindo o cálculo recursivo de grade e o bulk upsert de lançamentos.
+29 testes cobrindo o cálculo recursivo de grade, o bulk upsert de lançamentos,
+o consolidador, o CRUD de empreendimentos e o versionamento (clonagem + status).
 
 ## Arquitetura — visão rápida
 
@@ -91,21 +92,33 @@ frontend/src/
 ## Endpoints
 
 ```
-GET    /api/empreendimento
+# Empreendimentos
+GET    /api/empreendimento[?ativos=true]
 GET    /api/empreendimento/{id}
+POST   /api/empreendimento
+PUT    /api/empreendimento/{id}
+DELETE /api/empreendimento/{id}                 # 400 se tem orçamentos
 
-GET    /api/contas                      # árvore completa (recursiva)
+# Plano de contas
+GET    /api/contas                              # árvore completa (recursiva)
 POST   /api/contas
 PUT    /api/contas/{id}
-DELETE /api/contas/{id}                 # 400 se tem filhas ou lançamentos
+DELETE /api/contas/{id}                         # 400 se tem filhas ou lançamentos
 POST   /api/contas/reorder
 
+# Orçamento
 GET    /api/orcamento?empreendimento_id&ano[&versao]
 POST   /api/orcamento
-PUT    /api/orcamento/{id}              # atualiza status
-GET    /api/orcamento/{id}/grade        # árvore + 12 meses + totais
+PUT    /api/orcamento/{id}                      # atualiza status
+POST   /api/orcamento/{id}/clonar               # cria nova versão (Fase 2)
+GET    /api/orcamento/{id}/grade                # árvore + 12 meses + totais
+GET    /api/orcamento/versoes
+        ?empreendimento_id&ano                  # lista versões (Fase 2)
+GET    /api/orcamento/consolidado
+        ?ano[&empreendimento_ids=&...]          # soma de N empreendimentos (Fase 2)
 
-PUT    /api/lancamentos/bulk            # upsert em lote (valor 0 remove)
+# Lançamentos
+PUT    /api/lancamentos/bulk                    # upsert em lote (valor 0 remove)
 ```
 
 ## Decisões de design
@@ -142,7 +155,6 @@ multi-usuário (Fase 2+), trocar por Postgres + Alembic.
 
 ## O que NÃO está aqui (próximas fases)
 
-- Multi-empreendimento e consolidação (Fase 2)
 - Export para Sienge (Fase 3)
 - Importação de realizado e DRE orçado x realizado (Fase 4)
 - Dashboards de performance (Fase 5)

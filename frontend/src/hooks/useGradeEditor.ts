@@ -120,14 +120,19 @@ export function useGradeEditor(orcamento_id: number | undefined) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [status]);
 
-  // Cleanup de timers ao desmontar.
-  useEffect(
-    () => () => {
+  // Cleanup ao desmontar OU ao trocar de orcamento_id: flush primeiro,
+  // depois limpa timers. Isso evita perder edits ao trocar de empreendimento.
+  useEffect(() => {
+    return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       if (savedBadgeTimerRef.current) clearTimeout(savedBadgeTimerRef.current);
-    },
-    [],
-  );
+      if (pendingRef.current.size > 0) {
+        // fire-and-forget — request continua mesmo após o componente sumir
+        void flush();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orcamento_id]);
 
   return { editCell, editCells, flushNow, status, erroMsg };
 }

@@ -14,7 +14,6 @@ import {
 } from "ag-grid-community";
 import type {
   GradeNode,
-  GradeResponse,
   NaturezaConta,
   TipoConta,
 } from "../types/api";
@@ -149,24 +148,33 @@ function StatusBadge({ status }: { status: SaveStatus }) {
 }
 
 interface Props {
-  data: GradeResponse;
+  arvore: GradeNode[];
+  totais_mes: string[];
+  total_geral: string;
+  /** Quando undefined, a grade fica em modo readonly (sem edits, sem CRUD). */
+  orcamento_id?: number;
+  /** Texto livre exibido na toolbar (ex: "2026/v1 · rascunho" ou "Soma de 4 emp."). */
+  infoText: string;
 }
 
-export function BudgetGrid({ data }: Props) {
-  const orcamentoId = data.orcamento.id;
-  const { editCell, editCells, status, erroMsg } = useGradeEditor(orcamentoId);
+export function BudgetGrid({
+  arvore,
+  totais_mes,
+  total_geral,
+  orcamento_id,
+  infoText,
+}: Props) {
+  const readonly = orcamento_id === undefined;
+  const { editCell, editCells, status, erroMsg } = useGradeEditor(orcamento_id);
   const excluir = useExcluirConta();
   const [modal, setModal] = useState<ModalState>(null);
   const [erroCrud, setErroCrud] = useState<string | null>(null);
 
   const [expanded, setExpanded] = useState<Set<number>>(() =>
-    collectAllIds(data.arvore),
+    collectAllIds(arvore),
   );
 
-  const rows = useMemo(
-    () => flatten(data.arvore, expanded),
-    [data.arvore, expanded],
-  );
+  const rows = useMemo(() => flatten(arvore, expanded), [arvore, expanded]);
 
   const handleExcluir = useCallback(
     async (row: Row) => {
@@ -194,7 +202,7 @@ export function BudgetGrid({ data }: Props) {
     });
   };
 
-  const expandAll = () => setExpanded(collectAllIds(data.arvore));
+  const expandAll = () => setExpanded(collectAllIds(arvore));
   const collapseAll = () => setExpanded(new Set());
 
   const columnDefs = useMemo<ColDef<Row>[]>(() => {
@@ -218,7 +226,7 @@ export function BudgetGrid({ data }: Props) {
       tooltipValueGetter: (p) => formatBRL(p.value),
       type: "rightAligned",
       width: 130,
-      editable: (p) => p.data?.natureza === "analitica",
+      editable: (p) => !readonly && p.data?.natureza === "analitica",
       cellStyle: (p): CellStyle | undefined => {
         if (p.data?.natureza === "sintetica") {
           return { fontWeight: 600, background: "#f3f4f6" };
@@ -307,7 +315,7 @@ export function BudgetGrid({ data }: Props) {
                   </span>
                 )}
               </span>
-              {!isPinned && (
+              {!isPinned && !readonly && (
                 <span className="row-actions" style={{ display: "inline-flex", gap: 2 }}>
                   {podeAdicionarFilha && (
                     <button
@@ -380,10 +388,10 @@ export function BudgetGrid({ data }: Props) {
       nivel: 0,
       depth: 0,
       hasChildren: false,
-      total: data.total_geral,
-      valores: data.totais_mes,
+      total: total_geral,
+      valores: totais_mes,
     }),
-    [data.total_geral, data.totais_mes],
+    [total_geral, totais_mes],
   );
 
   /**
@@ -455,20 +463,22 @@ export function BudgetGrid({ data }: Props) {
         >
           Recolher tudo
         </button>
-        <button
-          onClick={() => setModal({ mode: "create", parent: null })}
-          className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
-          title="Adicionar conta de nível 1"
-        >
-          + Conta raiz
-        </button>
-        <StatusBadge status={status} />
-        {erroMsg && (
+        {!readonly && (
+          <button
+            onClick={() => setModal({ mode: "create", parent: null })}
+            className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
+            title="Adicionar conta de nível 1"
+          >
+            + Conta raiz
+          </button>
+        )}
+        {!readonly && <StatusBadge status={status} />}
+        {!readonly && erroMsg && (
           <span className="text-xs text-red-600 truncate max-w-md" title={erroMsg}>
             {erroMsg}
           </span>
         )}
-        {erroCrud && (
+        {!readonly && erroCrud && (
           <span
             className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1"
             title={erroCrud}
@@ -485,9 +495,7 @@ export function BudgetGrid({ data }: Props) {
           </span>
         )}
         <span className="ml-auto text-sm text-gray-500">
-          {rows.length} linhas visíveis · orçamento{" "}
-          <strong>SOPRA</strong> {data.orcamento.ano}/v{data.orcamento.versao} ·{" "}
-          {data.orcamento.status}
+          {rows.length} linhas visíveis · {infoText}
         </span>
       </div>
       <div className="flex-1 min-h-0">

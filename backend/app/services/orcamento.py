@@ -1,7 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Empreendimento, Orcamento
+from app.models import Empreendimento, Lancamento, Orcamento
 from app.schemas.orcamento import OrcamentoCreate, OrcamentoUpdate
 
 
@@ -61,3 +61,50 @@ def atualizar_status(db: Session, orcamento_id: int, data: OrcamentoUpdate) -> O
     db.commit()
     db.refresh(orc)
     return orc
+
+
+def clonar(db: Session, orcamento_id_fonte: int) -> Orcamento:
+    """Cria uma nova versão (versao++) clonando lançamentos da versão fonte.
+
+    Status da nova versão = 'rascunho'.
+    """
+    fonte = db.get(Orcamento, orcamento_id_fonte)
+    if fonte is None:
+        raise OrcamentoError("Orçamento fonte não encontrado.")
+
+    proxima_versao = (
+        db.execute(
+            select(func.coalesce(func.max(Orcamento.versao), 0)).where(
+                Orcamento.empreendimento_id == fonte.empreendimento_id,
+                Orcamento.ano == fonte.ano,
+            )
+        ).scalar_one()
+        + 1
+    )
+
+    novo = Orcamento(
+        empreendimento_id=fonte.empreendimento_id,
+        ano=fonte.ano,
+        versao=proxima_versao,
+        status="rascunho",
+    )
+    db.add(novo)
+    db.flush()  # pega o id
+
+    # Clona lançamentos
+    lancs_fonte = db.execute(
+        select(Lancamento).where(Lancamento.orcamento_id == fonte.id)
+    ).scalars().all()
+    for l in lancs_fonte:
+        db.add(
+            Lancamento(
+                orcamento_id=novo.id,
+                conta_id=l.conta_id,
+                mes=l.mes,
+                valor=l.valor,
+            )
+        )
+
+    db.commit()
+    db.refresh(novo)
+    return novo

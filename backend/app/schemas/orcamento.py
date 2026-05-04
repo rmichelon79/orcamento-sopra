@@ -48,3 +48,28 @@ class GradeResponse(BaseModel):
     arvore: list[GradeNode]
     totais_mes: list[Decimal]
     total_geral: Decimal
+
+
+class GradeConsolidadaResponse(BaseModel):
+    """Mesma estrutura da grade, mas somando vários empreendimentos.
+
+    Não há `orcamento` único — em vez disso lista os empreendimentos incluídos
+    e a versão de orçamento usada para cada um (mais recente por padrão).
+    """
+
+    ano: int
+    empreendimentos_incluidos: list[int]  # IDs
+    versoes_usadas: dict[int, int]  # empreendimento_id -> versao
+    arvore: list[GradeNode]
+    totais_mes: list[Decimal]
+    total_geral: Decimal
+
+
+class VersaoOrcamento(BaseModel):
+    """Item retornado por /api/orcamento/versoes."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    versao: int
+    status: StatusOrcamento
+    criado_em: datetime

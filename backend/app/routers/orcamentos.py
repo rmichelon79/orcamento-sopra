@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models import Orcamento
 from app.schemas.orcamento import (
+    GradeConsolidadaResponse,
     GradeResponse,
     OrcamentoCreate,
     OrcamentoOut,
     OrcamentoUpdate,
+    VersaoOrcamento,
 )
 from app.services import grade as grade_service
 from app.services import orcamento as orcamento_service
@@ -58,9 +62,56 @@ def atualizar(
     return OrcamentoOut.model_validate(orc)
 
 
+@router.post(
+    "/{orcamento_id}/clonar",
+    response_model=OrcamentoOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def clonar(orcamento_id: int, db: Session = Depends(get_db)) -> OrcamentoOut:
+    """Clona o orçamento (e seus lançamentos) em uma nova versão (rascunho)."""
+    try:
+        novo = orcamento_service.clonar(db, orcamento_id)
+    except OrcamentoError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return OrcamentoOut.model_validate(novo)
+
+
 @router.get("/{orcamento_id}/grade", response_model=GradeResponse)
 def grade(orcamento_id: int, db: Session = Depends(get_db)) -> GradeResponse:
     try:
         return grade_service.calcular_grade(db, orcamento_id)
     except GradeError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.get("/consolidado", response_model=GradeConsolidadaResponse)
+def consolidado(
+    ano: int,
+    empreendimento_ids: list[int] | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> GradeConsolidadaResponse:
+    """Consolida vários empreendimentos em uma só grade somando os lançamentos.
+
+    Se `empreendimento_ids` for omitido, soma todos os ativos.
+    Para cada empreendimento usa a versão mais recente do ano.
+    """
+    try:
+        return grade_service.calcular_consolidado(db, ano, empreendimento_ids)
+    except GradeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.get("/versoes", response_model=list[VersaoOrcamento])
+def versoes(
+    empreendimento_id: int, ano: int, db: Session = Depends(get_db)
+) -> list[VersaoOrcamento]:
+    """Lista todas as versões de orçamento para (empreendimento, ano)."""
+    rows = db.execute(
+        select(Orcamento)
+        .where(
+            Orcamento.empreendimento_id == empreendimento_id,
+            Orcamento.ano == ano,
+        )
+        .order_by(Orcamento.versao.asc())
+    ).scalars().all()
+    return [VersaoOrcamento.model_validate(o) for o in rows]
