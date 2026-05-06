@@ -1,11 +1,15 @@
-from pathlib import Path
+import os
 from collections.abc import Generator
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BACKEND_DIR / "orcamento.db"
+# Em produção, DB_PATH aponta para o volume persistente (ex: /data/orcamento.db).
+# Em dev, default = backend/orcamento.db.
+DB_PATH = Path(os.getenv("DB_PATH", str(BACKEND_DIR / "orcamento.db")))
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(

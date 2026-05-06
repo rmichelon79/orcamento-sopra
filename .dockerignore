@@ -1,0 +1,30 @@
+# Não precisa nada disso na imagem
+.git/
+.gitignore
+
+# Python local
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+backend/orcamento.db
+backend/orcamento.db-journal
+backend/tests/
+
+# Node local — só copiamos package*.json e código-fonte; ignoramos build local
+frontend/node_modules/
+frontend/dist/
+
+# Spec e docs não vão pra imagem
+*.md
+spec-mvp-fase-*.md
+
+# Configs do Fly
+fly.toml
+.fly/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
