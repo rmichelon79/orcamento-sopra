@@ -37,6 +37,10 @@ def _calcular_subtotais(no: GradeNode) -> None:
     no.total = sum(valores, start=ZERO)
 
 
+def _ordem_natural(codigo: str) -> tuple[int, ...]:
+    return tuple(int(p) for p in codigo.split("."))
+
+
 def _montar_arvore(
     contas: list[Conta], lancamentos_por_conta: dict[tuple[int, int], Decimal]
 ) -> list[GradeNode]:
@@ -56,6 +60,7 @@ def _montar_arvore(
             nivel=c.nivel,
             tipo=c.tipo,
             natureza=c.natureza,
+            tipo_orcamentario=c.tipo_orcamentario,
             ordem=c.ordem,
             ativo=c.ativo,
             valores=valores,
@@ -72,12 +77,28 @@ def _montar_arvore(
             by_id[c.parent_id].filhas.append(node)
 
     def _ordenar(nodes: list[GradeNode]) -> None:
-        nodes.sort(key=lambda n: n.ordem)
+        nodes.sort(key=lambda n: _ordem_natural(n.codigo))
         for n in nodes:
             _ordenar(n.filhas)
 
     _ordenar(raizes)
     return raizes
+
+
+def _agregar_total_geral(
+    raizes: list[GradeNode],
+) -> tuple[list[Decimal], Decimal]:
+    """Total geral = soma das raízes com sinal por `tipo_orcamentario`.
+
+    entrada: +1, saida: -1. Subtotais individuais (em cada raiz) ficam positivos.
+    """
+    totais_mes = _zeros()
+    for raiz in raizes:
+        sinal = Decimal("1") if raiz.tipo_orcamentario == "entrada" else Decimal("-1")
+        for m in range(12):
+            totais_mes[m] += raiz.valores[m] * sinal
+    total_geral = sum(totais_mes, start=ZERO)
+    return totais_mes, total_geral
 
 
 def calcular_grade(db: Session, orcamento_id: int) -> GradeResponse:
@@ -98,11 +119,7 @@ def calcular_grade(db: Session, orcamento_id: int) -> GradeResponse:
     for no in raizes:
         _calcular_subtotais(no)
 
-    totais_mes = _zeros()
-    for raiz in raizes:
-        for m in range(12):
-            totais_mes[m] += raiz.valores[m]
-    total_geral = sum(totais_mes, start=ZERO)
+    totais_mes, total_geral = _agregar_total_geral(raizes)
 
     return GradeResponse(
         orcamento=OrcamentoOut.model_validate(orc),
@@ -172,11 +189,7 @@ def calcular_consolidado(
     for no in raizes:
         _calcular_subtotais(no)
 
-    totais_mes = _zeros()
-    for raiz in raizes:
-        for m in range(12):
-            totais_mes[m] += raiz.valores[m]
-    total_geral = sum(totais_mes, start=ZERO)
+    totais_mes, total_geral = _agregar_total_geral(raizes)
 
     return GradeConsolidadaResponse(
         ano=ano,

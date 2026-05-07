@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { NaturezaConta, TipoConta } from "../types/api";
+import type {
+  NaturezaConta,
+  TipoConta,
+  TipoOrcamentario,
+} from "../types/api";
 import { useAtualizarConta, useCriarConta } from "../hooks/useContas";
 
 const TIPOS: { value: TipoConta; label: string }[] = [
@@ -42,6 +46,8 @@ interface EditProps extends BaseProps {
     natureza: NaturezaConta;
     ativo: boolean;
     nivel: number;
+    tipo_orcamentario: TipoOrcamentario;
+    parent_id: number | null;
   };
 }
 
@@ -67,10 +73,22 @@ export function ContaModal(props: Props) {
   const [natureza, setNatureza] = useState<NaturezaConta>(initialNatureza);
   const [ativo, setAtivo] = useState(initialAtivo);
   const [codigo, setCodigo] = useState(isEdit ? props.conta.codigo : "");
+  // Aplicado SÓ em raízes (sem parent). Filhas herdam.
+  const [tipoOrc, setTipoOrc] = useState<TipoOrcamentario>(
+    isEdit
+      ? props.conta.tipo_orcamentario
+      : props.mode === "create" && props.parent
+        ? "saida" // não usado (filha herda), mas precisa de valor
+        : "saida",
+  );
   const [erro, setErro] = useState<string | null>(null);
   const nomeRef = useRef<HTMLInputElement>(null);
 
   const CODIGO_RE = /^\d+(\.\d+)*$/;
+
+  // Mostra o seletor de entrada/saída quando a conta É raiz (sem pai)
+  const isRaiz =
+    isEdit ? props.conta.parent_id === null : !props.parent;
 
   const criar = useCriarConta();
   const atualizar = useAtualizarConta();
@@ -115,10 +133,13 @@ export function ContaModal(props: Props) {
           natureza: NaturezaConta;
           ativo: boolean;
           codigo?: string;
+          tipo_orcamentario?: TipoOrcamentario;
         } = { nome: trimmed, tipo, natureza, ativo };
-        // Só envia código se mudou (evita disparar cascade desnecessário)
         if (codigoTrim && codigoTrim !== props.conta.codigo) {
           dataUpdate.codigo = codigoTrim;
+        }
+        if (isRaiz && tipoOrc !== props.conta.tipo_orcamentario) {
+          dataUpdate.tipo_orcamentario = tipoOrc;
         }
         await atualizar.mutateAsync({ id: props.conta.id, data: dataUpdate });
       } else {
@@ -128,6 +149,7 @@ export function ContaModal(props: Props) {
           natureza,
           parent_id: props.parent?.id ?? null,
           ...(codigoTrim ? { codigo: codigoTrim } : {}),
+          ...(isRaiz ? { tipo_orcamentario: tipoOrc } : {}),
         });
       }
       onClose();
@@ -207,6 +229,51 @@ export function ContaModal(props: Props) {
                 : "Opcional. Em branco gera próximo na sequência. Ex: 2.30.99 cria gap intencional."}
             </p>
           </div>
+
+          {isRaiz && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tipo orçamentário
+              </label>
+              <div className="space-y-1">
+                <label className="flex items-start gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="tipo_orc"
+                    value="entrada"
+                    checked={tipoOrc === "entrada"}
+                    onChange={() => setTipoOrc("entrada")}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="font-medium text-green-700">⬆ Entrada</span>{" "}
+                    <span className="text-gray-500">
+                      — soma no total geral (receitas, aportes)
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="tipo_orc"
+                    value="saida"
+                    checked={tipoOrc === "saida"}
+                    onChange={() => setTipoOrc("saida")}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="font-medium text-red-700">⬇ Saída</span>{" "}
+                    <span className="text-gray-500">
+                      — subtrai no total geral (custos, despesas)
+                    </span>
+                  </span>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Aplicado só em contas raiz. Filhas herdam.
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

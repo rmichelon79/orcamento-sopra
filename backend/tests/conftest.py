@@ -53,9 +53,11 @@ def plano_contas_basico(db: Session):
 
     contas = {
         "1": Conta(codigo="1", nome="Receita", parent_id=None, nivel=1,
-                   tipo="receita", natureza="sintetica", ordem=1),
+                   tipo="receita", natureza="sintetica",
+                   tipo_orcamentario="entrada", ordem=1),
         "2": Conta(codigo="2", nome="Custo", parent_id=None, nivel=1,
-                   tipo="custo", natureza="sintetica", ordem=2),
+                   tipo="custo", natureza="sintetica",
+                   tipo_orcamentario="saida", ordem=2),
     }
     db.add_all(contas.values())
     db.flush()

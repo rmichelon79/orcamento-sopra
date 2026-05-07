@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 TipoConta = Literal["receita", "custo", "despesa", "investimento", "financeiro"]
 NaturezaConta = Literal["sintetica", "analitica"]
+TipoOrcamentario = Literal["entrada", "saida"]
 
 
 class ContaBase(BaseModel):
@@ -18,6 +19,8 @@ class ContaCreate(ContaBase):
     # Se omitido, gera automático como `parent.codigo + "." + ordem`.
     # Se preenchido, deve casar com o pai (ex: filha de "1.01" começa com "1.01.").
     codigo: str | None = Field(default=None, max_length=50)
+    # Aplicado só em raízes (parent_id NULL). Default 'saida' se não passar.
+    tipo_orcamentario: TipoOrcamentario | None = None
 
 
 class ContaUpdate(BaseModel):
@@ -28,6 +31,7 @@ class ContaUpdate(BaseModel):
     ativo: bool | None = None
     # Mudar código pode mover a conta entre pais e dispara cascade nas filhas.
     codigo: str | None = Field(default=None, max_length=50)
+    tipo_orcamentario: TipoOrcamentario | None = None
 
 
 class ContaOut(BaseModel):
@@ -40,6 +44,7 @@ class ContaOut(BaseModel):
     nivel: int
     tipo: TipoConta
     natureza: NaturezaConta
+    tipo_orcamentario: TipoOrcamentario
     ordem: int
     ativo: bool
 

@@ -15,6 +15,10 @@ class Conta(Base):
             "tipo IN ('receita', 'custo', 'despesa', 'investimento', 'financeiro')",
             name="ck_conta_tipo",
         ),
+        CheckConstraint(
+            "tipo_orcamentario IN ('entrada', 'saida')",
+            name="ck_conta_tipo_orcamentario",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -26,6 +30,11 @@ class Conta(Base):
     nivel: Mapped[int] = mapped_column(Integer, nullable=False)
     tipo: Mapped[str] = mapped_column(String, nullable=False)
     natureza: Mapped[str] = mapped_column(String, nullable=False)
+    # Aplicado apenas nas raízes (parent_id NULL). Filhas herdam implicitamente.
+    # Usado pelo cálculo do total_geral: entrada = +, saida = −.
+    tipo_orcamentario: Mapped[str] = mapped_column(
+        String, nullable=False, default="saida", server_default="saida"
+    )
     ordem: Mapped[int] = mapped_column(Integer, nullable=False)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

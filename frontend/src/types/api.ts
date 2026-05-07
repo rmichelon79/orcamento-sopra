@@ -8,6 +8,7 @@ export type TipoConta =
   | "investimento"
   | "financeiro";
 export type NaturezaConta = "sintetica" | "analitica";
+export type TipoOrcamentario = "entrada" | "saida";
 export type StatusOrcamento = "rascunho" | "aprovado" | "arquivado";
 
 export interface Empreendimento {
@@ -25,6 +26,7 @@ export interface Conta {
   nivel: number;
   tipo: TipoConta;
   natureza: NaturezaConta;
+  tipo_orcamentario: TipoOrcamentario;
   ordem: number;
   ativo: boolean;
 }

@@ -106,6 +106,7 @@ def _to_tree_node(c: Conta) -> ContaTreeNode:
         nivel=c.nivel,
         tipo=c.tipo,
         natureza=c.natureza,
+        tipo_orcamentario=c.tipo_orcamentario,
         ordem=c.ordem,
         ativo=c.ativo,
         filhas=[],
@@ -183,6 +184,9 @@ def criar_conta(db: Session, data: ContaCreate) -> Conta:
         db, parent.id if parent else None
     )
 
+    # tipo_orcamentario só faz diferença na raiz; default 'saida'
+    tipo_orc = data.tipo_orcamentario or "saida"
+
     conta = Conta(
         codigo=codigo,
         nome=data.nome,
@@ -190,6 +194,7 @@ def criar_conta(db: Session, data: ContaCreate) -> Conta:
         nivel=nivel,
         tipo=data.tipo,
         natureza=data.natureza,
+        tipo_orcamentario=tipo_orc,
         ordem=ordem,
         ativo=True,
     )
@@ -321,6 +326,8 @@ def atualizar_conta(db: Session, conta_id: int, data: ContaUpdate) -> Conta:
         conta.ordem = data.ordem
     if data.ativo is not None:
         conta.ativo = data.ativo
+    if data.tipo_orcamentario is not None:
+        conta.tipo_orcamentario = data.tipo_orcamentario
 
     db.commit()
     db.refresh(conta)

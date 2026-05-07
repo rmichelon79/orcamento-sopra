@@ -11,7 +11,7 @@ em ../../plano-de-contas-sienge.pdf, fora do repo). 217 contas em até 4 níveis
 Convenção: contas redutoras (prefixo "(-)") aceitam valor negativo no lançamento.
 Não há campo "redutora" no schema — o sinal do valor já carrega a semântica.
 """
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 
 from app.database import Base, SessionLocal, engine
 from app.models import Conta, Empreendimento, Orcamento
@@ -259,6 +259,9 @@ def _criar_plano(db) -> int:
             parent_codigo = ".".join(partes[:-1])
             parent_id = by_codigo[parent_codigo]
         ordem = int(partes[-1])
+        # Raiz "1" é entrada (Receitas); raiz "2" é saída.
+        # Não-raízes ficam com 'saida' por default — não é usado no cálculo.
+        tipo_orc = "entrada" if codigo == "1" else "saida"
         conta = Conta(
             codigo=codigo,
             nome=nome,
@@ -266,6 +269,7 @@ def _criar_plano(db) -> int:
             nivel=nivel,
             tipo=tipo,
             natureza=natureza,
+            tipo_orcamentario=tipo_orc,
             ordem=ordem,
             ativo=True,
         )
@@ -275,7 +279,31 @@ def _criar_plano(db) -> int:
     return len(by_codigo)
 
 
+def _migrar_schema() -> None:
+    """Aplica ALTERs idempotentes pra schema mudar sem precisar de Alembic.
+
+    Hoje: adiciona coluna `tipo_orcamentario` em `conta` se ainda não existir,
+    e seta 'entrada' para a raiz '1' (compat com banco já populado).
+    """
+    inspector = inspect(engine)
+    if "conta" not in inspector.get_table_names():
+        return  # tabela ainda não existe; create_all vai criar com a coluna nova
+    cols = {c["name"] for c in inspector.get_columns("conta")}
+    if "tipo_orcamentario" in cols:
+        return  # já migrado
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE conta ADD COLUMN tipo_orcamentario VARCHAR NOT NULL DEFAULT 'saida'"
+        ))
+        # raiz "1" historicamente é entrada
+        conn.execute(text(
+            "UPDATE conta SET tipo_orcamentario='entrada' WHERE codigo='1'"
+        ))
+    print("Migração: coluna tipo_orcamentario adicionada (raiz '1' marcada como entrada).")
+
+
 def seed() -> None:
+    _migrar_schema()
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         # 1) Empreendimentos

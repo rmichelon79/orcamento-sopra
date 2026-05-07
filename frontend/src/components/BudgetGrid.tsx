@@ -16,6 +16,7 @@ import type {
   GradeNode,
   NaturezaConta,
   TipoConta,
+  TipoOrcamentario,
 } from "../types/api";
 import { useGradeEditor, type SaveStatus } from "../hooks/useGradeEditor";
 import { useExcluirConta } from "../hooks/useContas";
@@ -36,6 +37,8 @@ interface Row {
   tipo: TipoConta;
   ativo: boolean;
   nivel: number;
+  parent_id: number | null;
+  tipo_orcamentario: TipoOrcamentario;
   depth: number;
   hasChildren: boolean;
   total: string;
@@ -64,6 +67,8 @@ function flatten(
       tipo: n.tipo,
       ativo: n.ativo,
       nivel: n.nivel,
+      parent_id: n.parent_id,
+      tipo_orcamentario: n.tipo_orcamentario,
       depth,
       hasChildren: n.filhas.length > 0,
       total: n.total,
@@ -305,6 +310,21 @@ export function BudgetGrid({
                 title={row.nome}
               >
                 {row.nome}
+                {row.parent_id === null && row.id !== -1 && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color:
+                        row.tipo_orcamentario === "entrada"
+                          ? "#15803d"
+                          : "#b91c1c",
+                    }}
+                  >
+                    {row.tipo_orcamentario === "entrada" ? "⬆ entrada" : "⬇ saída"}
+                  </span>
+                )}
                 {!row.ativo && (
                   <span
                     style={{
@@ -389,6 +409,8 @@ export function BudgetGrid({
       tipo: "receita",
       ativo: true,
       nivel: 0,
+      parent_id: null,
+      tipo_orcamentario: "entrada",
       depth: 0,
       hasChildren: false,
       total: total_geral,
@@ -566,6 +588,8 @@ export function BudgetGrid({
             natureza: modal.conta.natureza,
             ativo: modal.conta.ativo,
             nivel: modal.conta.nivel,
+            parent_id: modal.conta.parent_id,
+            tipo_orcamentario: modal.conta.tipo_orcamentario,
           }}
           onClose={() => setModal(null)}
         />

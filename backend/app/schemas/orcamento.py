@@ -36,6 +36,7 @@ class GradeNode(BaseModel):
     nivel: int
     tipo: str
     natureza: Literal["sintetica", "analitica"]
+    tipo_orcamentario: Literal["entrada", "saida"]
     ordem: int
     ativo: bool
     valores: list[Decimal]

@@ -8,6 +8,7 @@ import type {
   NaturezaConta,
   Orcamento,
   TipoConta,
+  TipoOrcamentario,
   VersaoOrcamento,
 } from "../types/api";
 
@@ -18,6 +19,7 @@ export interface ContaCreatePayload {
   parent_id?: number | null;
   ordem?: number;
   codigo?: string;
+  tipo_orcamentario?: TipoOrcamentario;
 }
 
 export interface ContaUpdatePayload {
@@ -27,6 +29,7 @@ export interface ContaUpdatePayload {
   ordem?: number;
   ativo?: boolean;
   codigo?: string;
+  tipo_orcamentario?: TipoOrcamentario;
 }
 
 export interface EmpreendimentoCreatePayload {
