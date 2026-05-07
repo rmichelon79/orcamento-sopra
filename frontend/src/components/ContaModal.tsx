@@ -66,8 +66,11 @@ export function ContaModal(props: Props) {
   const [tipo, setTipo] = useState<TipoConta>(initialTipo);
   const [natureza, setNatureza] = useState<NaturezaConta>(initialNatureza);
   const [ativo, setAtivo] = useState(initialAtivo);
+  const [codigo, setCodigo] = useState(isEdit ? props.conta.codigo : "");
   const [erro, setErro] = useState<string | null>(null);
   const nomeRef = useRef<HTMLInputElement>(null);
+
+  const CODIGO_RE = /^\d+(\.\d+)*$/;
 
   const criar = useCriarConta();
   const atualizar = useAtualizarConta();
@@ -99,18 +102,32 @@ export function ContaModal(props: Props) {
       setErro("Nome é obrigatório.");
       return;
     }
+    const codigoTrim = codigo.trim();
+    if (codigoTrim && !CODIGO_RE.test(codigoTrim)) {
+      setErro("Código inválido. Use só dígitos separados por pontos (ex: 2.30.01).");
+      return;
+    }
     try {
       if (isEdit) {
-        await atualizar.mutateAsync({
-          id: props.conta.id,
-          data: { nome: trimmed, tipo, natureza, ativo },
-        });
+        const dataUpdate: {
+          nome: string;
+          tipo: TipoConta;
+          natureza: NaturezaConta;
+          ativo: boolean;
+          codigo?: string;
+        } = { nome: trimmed, tipo, natureza, ativo };
+        // Só envia código se mudou (evita disparar cascade desnecessário)
+        if (codigoTrim && codigoTrim !== props.conta.codigo) {
+          dataUpdate.codigo = codigoTrim;
+        }
+        await atualizar.mutateAsync({ id: props.conta.id, data: dataUpdate });
       } else {
         await criar.mutateAsync({
           nome: trimmed,
           tipo,
           natureza,
           parent_id: props.parent?.id ?? null,
+          ...(codigoTrim ? { codigo: codigoTrim } : {}),
         });
       }
       onClose();
@@ -170,6 +187,25 @@ export function ContaModal(props: Props) {
               className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               maxLength={200}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Código
+            </label>
+            <input
+              type="text"
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value)}
+              className="w-full px-3 py-2 border rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              maxLength={50}
+              placeholder={isEdit ? "" : "deixe vazio para auto-gerar"}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {isEdit
+                ? "Mudar o código move a conta no plano (e suas filhas re-prefixam automaticamente)."
+                : "Opcional. Em branco gera próximo na sequência. Ex: 2.30.99 cria gap intencional."}
+            </p>
           </div>
 
           <div>

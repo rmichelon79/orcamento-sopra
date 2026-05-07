@@ -17,6 +17,7 @@ export interface ContaCreatePayload {
   natureza: NaturezaConta;
   parent_id?: number | null;
   ordem?: number;
+  codigo?: string;
 }
 
 export interface ContaUpdatePayload {
@@ -25,6 +26,7 @@ export interface ContaUpdatePayload {
   natureza?: NaturezaConta;
   ordem?: number;
   ativo?: boolean;
+  codigo?: string;
 }
 
 export interface EmpreendimentoCreatePayload {

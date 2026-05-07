@@ -15,6 +15,9 @@ class ContaBase(BaseModel):
 class ContaCreate(ContaBase):
     parent_id: int | None = None
     ordem: int | None = None
+    # Se omitido, gera automático como `parent.codigo + "." + ordem`.
+    # Se preenchido, deve casar com o pai (ex: filha de "1.01" começa com "1.01.").
+    codigo: str | None = Field(default=None, max_length=50)
 
 
 class ContaUpdate(BaseModel):
@@ -23,6 +26,8 @@ class ContaUpdate(BaseModel):
     natureza: NaturezaConta | None = None
     ordem: int | None = None
     ativo: bool | None = None
+    # Mudar código pode mover a conta entre pais e dispara cascade nas filhas.
+    codigo: str | None = Field(default=None, max_length=50)
 
 
 class ContaOut(BaseModel):
