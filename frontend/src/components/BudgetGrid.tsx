@@ -155,6 +155,8 @@ interface Props {
   orcamento_id?: number;
   /** Texto livre exibido na toolbar (ex: "2026/v1 · rascunho" ou "Soma de 4 emp."). */
   infoText: string;
+  /** URL absoluta ou relativa pra baixar XLSX (ex: "/api/orcamento/4/export.xlsx"). */
+  exportUrl?: string;
 }
 
 export function BudgetGrid({
@@ -163,6 +165,7 @@ export function BudgetGrid({
   total_geral,
   orcamento_id,
   infoText,
+  exportUrl,
 }: Props) {
   const readonly = orcamento_id === undefined;
   const { editCell, editCells, status, erroMsg } = useGradeEditor(orcamento_id);
@@ -470,6 +473,33 @@ export function BudgetGrid({
             title="Adicionar conta de nível 1"
           >
             + Conta raiz
+          </button>
+        )}
+        {exportUrl && (
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch(exportUrl, { credentials: "include" });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const blob = await res.blob();
+                const cd = res.headers.get("Content-Disposition") ?? "";
+                const m = cd.match(/filename="?([^";]+)"?/);
+                const name = m?.[1] ?? "orcamento.xlsx";
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(a.href);
+              } catch (err) {
+                window.alert(`Erro ao exportar: ${String(err)}`);
+              }
+            }}
+            className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
+            title="Baixar XLSX"
+          >
+            ⬇ XLSX
           </button>
         )}
         {!readonly && <StatusBadge status={status} />}

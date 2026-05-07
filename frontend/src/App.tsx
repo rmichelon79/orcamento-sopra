@@ -105,6 +105,7 @@ export default function App() {
   let gridOrcamentoId: number | undefined;
   let infoText = "";
   let tituloHeader = "";
+  let exportUrl: string | undefined;
 
   if (isConsolidado) {
     if (!gradeConsolidada.data) {
@@ -121,6 +122,10 @@ export default function App() {
     gridOrcamentoId = undefined; // readonly
     infoText = `${g.ano} · soma de ${g.empreendimentos_incluidos.length} empreendimentos`;
     tituloHeader = "Consolidado";
+    const idsParam = consolidado.ids
+      .map((id) => `empreendimento_ids=${id}`)
+      .join("&");
+    exportUrl = `/api/orcamento/consolidado/export.xlsx?ano=${g.ano}${idsParam ? "&" + idsParam : ""}`;
   } else {
     if (!grade.data || !empreendimentoAtivo) {
       return (
@@ -139,6 +144,7 @@ export default function App() {
         : undefined;
     infoText = `${grade.data.orcamento.ano}/v${grade.data.orcamento.versao} · ${grade.data.orcamento.status}`;
     tituloHeader = empreendimentoAtivo.nome;
+    exportUrl = `/api/orcamento/${grade.data.orcamento.id}/export.xlsx`;
   }
 
   return (
@@ -214,6 +220,7 @@ export default function App() {
           total_geral={gridTotalGeral}
           orcamento_id={gridOrcamentoId}
           infoText={infoText}
+          exportUrl={exportUrl}
         />
       </main>
 

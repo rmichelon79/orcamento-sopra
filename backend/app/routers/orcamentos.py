@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Orcamento
+from app.models import Empreendimento, Orcamento
 from app.schemas.orcamento import (
     GradeConsolidadaResponse,
     GradeResponse,
@@ -12,10 +12,15 @@ from app.schemas.orcamento import (
     OrcamentoUpdate,
     VersaoOrcamento,
 )
+from app.services import export as export_service
 from app.services import grade as grade_service
 from app.services import orcamento as orcamento_service
 from app.services.grade import GradeError
 from app.services.orcamento import OrcamentoError
+
+XLSX_MEDIA = (
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
 
 router = APIRouter(prefix="/api/orcamento", tags=["orcamento"])
 
@@ -115,3 +120,52 @@ def versoes(
         .order_by(Orcamento.versao.asc())
     ).scalars().all()
     return [VersaoOrcamento.model_validate(o) for o in rows]
+
+
+# IMPORTANTE: rota /consolidado/export.xlsx vem ANTES da {orcamento_id}/export.xlsx
+# pra FastAPI não tentar parsear "consolidado" como int.
+@router.get("/consolidado/export.xlsx", responses={200: {"content": {XLSX_MEDIA: {}}}})
+def export_consolidado(
+    ano: int,
+    empreendimento_ids: list[int] | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Exporta o consolidado em XLSX."""
+    try:
+        grade = grade_service.calcular_consolidado(db, ano, empreendimento_ids)
+    except GradeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    emps = {
+        e.id: e
+        for e in db.execute(
+            select(Empreendimento).where(
+                Empreendimento.id.in_(grade.empreendimentos_incluidos)
+            )
+        ).scalars()
+    }
+    codigos = [emps[i].codigo for i in grade.empreendimentos_incluidos if i in emps]
+    payload = export_service.gerar_xlsx_consolidado(grade, codigos)
+    filename = f"orcamento-consolidado-{ano}.xlsx"
+    return Response(
+        content=payload,
+        media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{orcamento_id}/export.xlsx", responses={200: {"content": {XLSX_MEDIA: {}}}})
+def export_individual(orcamento_id: int, db: Session = Depends(get_db)) -> Response:
+    """Exporta o orçamento individual em XLSX."""
+    try:
+        grade = grade_service.calcular_grade(db, orcamento_id)
+    except GradeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    emp = db.get(Empreendimento, grade.orcamento.empreendimento_id)
+    assert emp is not None
+    payload = export_service.gerar_xlsx_individual(grade, emp.codigo, emp.nome)
+    filename = f"orcamento-{emp.codigo}-{grade.orcamento.ano}-v{grade.orcamento.versao}.xlsx"
+    return Response(
+        content=payload,
+        media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
