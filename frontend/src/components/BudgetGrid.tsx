@@ -1,10 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import {
   AllCommunityModule,
   ModuleRegistry,
   themeQuartz,
-  type CellKeyDownEvent,
   type CellStyle,
   type ColDef,
   type ICellRendererParams,
@@ -420,36 +419,42 @@ export function BudgetGrid({
   );
 
   /**
-   * Paste manual a partir do Excel.
+   * Paste do Excel sem prompt de permissão.
    *
-   * Clipboard / Range Selection foram movidos para Enterprise no AG Grid v32+,
-   * então implementamos no nível da célula: ao pressionar Cmd/Ctrl+V em uma
-   * célula focada (não em edição), lemos o clipboard, parseamos como matriz
-   * tab-separada e aplicamos em sequência a partir da célula focada.
+   * Em vez de chamar `navigator.clipboard.readText()` (que requer permissão e
+   * abre o pop-up "Permitir colar?"), escutamos o evento `paste` nativo. O
+   * browser fornece `event.clipboardData` direto porque o gesto Cmd/Ctrl+V já
+   * é uma autorização implícita — sem prompt.
+   *
+   * AG Grid v32+ tirou Range Selection / Clipboard pra Enterprise, então essa
+   * camada manual é necessária. Quando a célula focada é de mês e a grade não
+   * está em modo de edição, parseamos a matriz tab-separada e aplicamos
+   * via `editCells` (passa pelo mesmo path otimista do single-edit).
    */
-  const onCellKeyDown = useCallback(
-    async (params: CellKeyDownEvent<Row>) => {
-      const e = params.event as KeyboardEvent | null;
-      if (!e) return;
-      const isPaste = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v";
-      if (!isPaste) return;
-      const colId = params.column.getColId();
-      const m = colId.match(/^mes_(\d+)$/);
-      if (!m) return; // foco não está em coluna de mês
-      e.preventDefault();
-      e.stopPropagation();
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      // Ignora paste dentro de input/textarea (modo de edição da célula
+      // ou outros inputs como modais)
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable='true']")) return;
 
-      let text: string;
-      try {
-        text = await navigator.clipboard.readText();
-      } catch {
-        return;
-      }
+      const focused = document.querySelector(".ag-cell-focus");
+      if (!focused) return;
+      const colId = focused.getAttribute("col-id") ?? "";
+      const m = colId.match(/^mes_(\d+)$/);
+      if (!m) return;
+
+      const text = e.clipboardData?.getData("text/plain");
       if (!text) return;
 
+      e.preventDefault();
+
       const startMes = Number(m[1]);
-      const startRowIdx = params.rowIndex ?? 0;
-      // Excel separa células por \t e linhas por \n. CSV simples usa ;.
+      const rowEl = focused.closest("[row-index]");
+      const startRowIdx = rowEl
+        ? Number(rowEl.getAttribute("row-index"))
+        : 0;
+
       const matrix = text
         .replace(/\r/g, "")
         .split("\n")
@@ -469,9 +474,10 @@ export function BudgetGrid({
         }
       }
       if (edits.length > 0) editCells(edits);
-    },
-    [rows, editCells],
-  );
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [rows, editCells]);
 
   return (
     <div className="flex flex-col h-full">
@@ -561,7 +567,6 @@ export function BudgetGrid({
           suppressMovableColumns
           stopEditingWhenCellsLoseFocus
           singleClickEdit={false}
-          onCellKeyDown={onCellKeyDown}
           pinnedBottomRowData={[totaisMesRow]}
           getRowStyle={(p) =>
             p.node.rowPinned === "bottom"
