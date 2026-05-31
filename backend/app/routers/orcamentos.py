@@ -21,6 +21,7 @@ from app.services.orcamento import OrcamentoError
 XLSX_MEDIA = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
+MD_MEDIA = "text/markdown; charset=utf-8"
 
 router = APIRouter(prefix="/api/orcamento", tags=["orcamento"])
 
@@ -167,5 +168,51 @@ def export_individual(orcamento_id: int, db: Session = Depends(get_db)) -> Respo
     return Response(
         content=payload,
         media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# Markdown (estrutura nested pra XMind / Mindmeister / outros)
+@router.get("/consolidado/export.md", responses={200: {"content": {MD_MEDIA: {}}}})
+def export_md_consolidado(
+    ano: int,
+    empreendimento_ids: list[int] | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> Response:
+    try:
+        grade = grade_service.calcular_consolidado(db, ano, empreendimento_ids)
+    except GradeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    emps = {
+        e.id: e
+        for e in db.execute(
+            select(Empreendimento).where(
+                Empreendimento.id.in_(grade.empreendimentos_incluidos)
+            )
+        ).scalars()
+    }
+    codigos = [emps[i].codigo for i in grade.empreendimentos_incluidos if i in emps]
+    payload = export_service.gerar_md_consolidado(grade, codigos)
+    filename = f"orcamento-consolidado-{ano}.md"
+    return Response(
+        content=payload.encode("utf-8"),
+        media_type=MD_MEDIA,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{orcamento_id}/export.md", responses={200: {"content": {MD_MEDIA: {}}}})
+def export_md_individual(orcamento_id: int, db: Session = Depends(get_db)) -> Response:
+    try:
+        grade = grade_service.calcular_grade(db, orcamento_id)
+    except GradeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    emp = db.get(Empreendimento, grade.orcamento.empreendimento_id)
+    assert emp is not None
+    payload = export_service.gerar_md_individual(grade, emp.codigo, emp.nome)
+    filename = f"orcamento-{emp.codigo}-{grade.orcamento.ano}-v{grade.orcamento.versao}.md"
+    return Response(
+        content=payload.encode("utf-8"),
+        media_type=MD_MEDIA,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

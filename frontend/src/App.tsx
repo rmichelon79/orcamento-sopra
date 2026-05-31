@@ -106,6 +106,7 @@ export default function App() {
   let infoText = "";
   let tituloHeader = "";
   let exportUrl: string | undefined;
+  let exportMdUrl: string | undefined;
 
   if (isConsolidado) {
     if (!gradeConsolidada.data) {
@@ -125,7 +126,9 @@ export default function App() {
     const idsParam = consolidado.ids
       .map((id) => `empreendimento_ids=${id}`)
       .join("&");
-    exportUrl = `/api/orcamento/consolidado/export.xlsx?ano=${g.ano}${idsParam ? "&" + idsParam : ""}`;
+    const qs = `ano=${g.ano}${idsParam ? "&" + idsParam : ""}`;
+    exportUrl = `/api/orcamento/consolidado/export.xlsx?${qs}`;
+    exportMdUrl = `/api/orcamento/consolidado/export.md?${qs}`;
   } else {
     if (!grade.data || !empreendimentoAtivo) {
       return (
@@ -144,7 +147,9 @@ export default function App() {
         : undefined;
     infoText = `${grade.data.orcamento.ano}/v${grade.data.orcamento.versao} · ${grade.data.orcamento.status}`;
     tituloHeader = empreendimentoAtivo.nome;
-    exportUrl = `/api/orcamento/${grade.data.orcamento.id}/export.xlsx`;
+    const id = grade.data.orcamento.id;
+    exportUrl = `/api/orcamento/${id}/export.xlsx`;
+    exportMdUrl = `/api/orcamento/${id}/export.md`;
   }
 
   return (
@@ -221,6 +226,7 @@ export default function App() {
           orcamento_id={gridOrcamentoId}
           infoText={infoText}
           exportUrl={exportUrl}
+          exportMdUrl={exportMdUrl}
         />
       </main>
 

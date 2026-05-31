@@ -143,3 +143,50 @@ def gerar_xlsx_consolidado(
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Export Markdown (estrutura nested pra XMind / outros mind maps)
+# ────────────────────────────────────────────────────────────────────────────
+
+def _ordem_natural(codigo: str) -> tuple[int, ...]:
+    return tuple(int(p) for p in codigo.split("."))
+
+
+def _no_md(node: GradeNode, depth: int, lines: list[str], eh_raiz: bool) -> None:
+    indent = "  " * depth
+    badge = ""
+    if eh_raiz:
+        if node.tipo_orcamentario == "entrada":
+            badge = " [entrada]"
+        else:
+            badge = " [saída]"
+    lines.append(f"{indent}- {node.codigo} {node.nome}{badge}")
+    for filha in sorted(node.filhas, key=lambda n: _ordem_natural(n.codigo)):
+        _no_md(filha, depth + 1, lines, eh_raiz=False)
+
+
+def gerar_md_individual(
+    grade: GradeResponse, empreendimento_codigo: str, empreendimento_nome: str
+) -> str:
+    lines = [
+        f"# Orçamento — {empreendimento_codigo} {empreendimento_nome} · "
+        f"{grade.orcamento.ano}/v{grade.orcamento.versao} · {grade.orcamento.status}",
+        "",
+    ]
+    for raiz in sorted(grade.arvore, key=lambda n: _ordem_natural(n.codigo)):
+        _no_md(raiz, 0, lines, eh_raiz=True)
+    return "\n".join(lines) + "\n"
+
+
+def gerar_md_consolidado(
+    grade: GradeConsolidadaResponse, codigos_incluidos: list[str]
+) -> str:
+    lines = [
+        f"# Orçamento Consolidado · {grade.ano} · "
+        f"soma de {len(codigos_incluidos)} empreendimentos: {', '.join(codigos_incluidos)}",
+        "",
+    ]
+    for raiz in sorted(grade.arvore, key=lambda n: _ordem_natural(n.codigo)):
+        _no_md(raiz, 0, lines, eh_raiz=True)
+    return "\n".join(lines) + "\n"
