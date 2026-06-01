@@ -27,7 +27,7 @@ export function useAtualizarEmpreendimento() {
       id,
       data,
     }: {
-      id: number;
+      id: string;
       data: EmpreendimentoUpdatePayload;
     }) => api.atualizarEmpreendimento(id, data),
     onSuccess: () => invalidateAll(qc),
@@ -37,7 +37,7 @@ export function useAtualizarEmpreendimento() {
 export function useExcluirEmpreendimento() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.excluirEmpreendimento(id),
+    mutationFn: (id: string) => api.excluirEmpreendimento(id),
     onSuccess: () => invalidateAll(qc),
   });
 }

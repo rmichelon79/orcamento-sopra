@@ -10,7 +10,7 @@ function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
 }
 
 export function useVersoes(
-  empreendimento_id: number | undefined,
+  empreendimento_id: string | undefined,
   ano: number,
 ) {
   return useQuery({

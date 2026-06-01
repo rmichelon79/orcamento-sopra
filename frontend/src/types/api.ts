@@ -12,7 +12,7 @@ export type TipoOrcamentario = "entrada" | "saida";
 export type StatusOrcamento = "rascunho" | "aprovado" | "arquivado";
 
 export interface Empreendimento {
-  id: number;
+  id: string; // uuid (tabela canônica compartilhada entre os apps)
   codigo: string;
   nome: string;
   ativo: boolean;
@@ -37,7 +37,7 @@ export interface ContaTreeNode extends Conta {
 
 export interface Orcamento {
   id: number;
-  empreendimento_id: number;
+  empreendimento_id: string; // uuid
   ano: number;
   versao: number;
   status: StatusOrcamento;
@@ -59,7 +59,7 @@ export interface GradeResponse {
 
 export interface GradeConsolidadaResponse {
   ano: number;
-  empreendimentos_incluidos: number[];
+  empreendimentos_incluidos: string[];
   versoes_usadas: Record<string, number>;
   arvore: GradeNode[];
   totais_mes: string[];
