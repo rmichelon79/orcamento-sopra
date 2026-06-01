@@ -15,6 +15,7 @@ import {
 } from "./hooks/useGrade";
 import { useVersoes } from "./hooks/useOrcamentoMutations";
 import { useSelection } from "./hooks/useSelection";
+import { supabase } from "./api/supabase";
 
 export default function App() {
   const { selection, update } = useSelection();
@@ -197,6 +198,17 @@ export default function App() {
           title="Gerenciar empreendimentos"
         >
           ⚙ Empreendimentos
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            await supabase.auth.signOut();
+            location.reload();
+          }}
+          className="px-3 py-1.5 text-sm border rounded bg-white hover:bg-gray-50 text-gray-500"
+          title="Sair"
+        >
+          🔒 Sair
         </button>
       </header>
 
