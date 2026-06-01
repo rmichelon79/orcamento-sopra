@@ -3,12 +3,12 @@ import type { Empreendimento } from "../types/api";
 
 const STORAGE_KEY = "consolidado_empreendimento_ids";
 
-function loadFromStorage(): number[] | null {
+function loadFromStorage(): string[] | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.every((x) => typeof x === "number")) {
+    if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) {
       return parsed;
     }
     return null;
@@ -17,7 +17,7 @@ function loadFromStorage(): number[] | null {
   }
 }
 
-function saveToStorage(ids: number[]) {
+function saveToStorage(ids: string[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
 }
 
@@ -27,7 +27,7 @@ function saveToStorage(ids: number[]) {
  * - Filtra automaticamente IDs que não existem mais ou ficaram inativos.
  */
 export function useConsolidadoSelecionados(empreendimentos: Empreendimento[]) {
-  const [ids, setIdsState] = useState<number[]>([]);
+  const [ids, setIdsState] = useState<string[]>([]);
 
   useEffect(() => {
     const ativos = empreendimentos.filter((e) => e.ativo).map((e) => e.id);
@@ -43,7 +43,7 @@ export function useConsolidadoSelecionados(empreendimentos: Empreendimento[]) {
     setIdsState(validos.length > 0 ? validos : ativos);
   }, [empreendimentos]);
 
-  const setIds = (next: number[]) => {
+  const setIds = (next: string[]) => {
     setIdsState(next);
     saveToStorage(next);
   };
@@ -53,8 +53,8 @@ export function useConsolidadoSelecionados(empreendimentos: Empreendimento[]) {
 
 interface Props {
   empreendimentos: Empreendimento[];
-  selectedIds: number[];
-  onChange: (ids: number[]) => void;
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
   onClose: () => void;
 }
 
@@ -65,7 +65,7 @@ export function ConsolidadoSelectorModal({
   onClose,
 }: Props) {
   const ativos = empreendimentos.filter((e) => e.ativo);
-  const [draft, setDraft] = useState<number[]>(selectedIds);
+  const [draft, setDraft] = useState<string[]>(selectedIds);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -75,7 +75,7 @@ export function ConsolidadoSelectorModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const toggle = (id: number) => {
+  const toggle = (id: string) => {
     setDraft((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );

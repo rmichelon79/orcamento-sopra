@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
+import { gerarXlsx, gerarMd, baixar } from "../api/export";
 import {
   AllCommunityModule,
   ModuleRegistry,
@@ -159,10 +160,8 @@ interface Props {
   orcamento_id?: number;
   /** Texto livre exibido na toolbar (ex: "2026/v1 · rascunho" ou "Soma de 4 emp."). */
   infoText: string;
-  /** URL pra baixar XLSX (ex: "/api/orcamento/4/export.xlsx"). */
-  exportUrl?: string;
-  /** URL pra baixar Markdown (ex: "/api/orcamento/4/export.md"). */
-  exportMdUrl?: string;
+  /** Título usado nos arquivos exportados (XLSX/MD). */
+  tituloExport: string;
 }
 
 export function BudgetGrid({
@@ -171,8 +170,7 @@ export function BudgetGrid({
   total_geral,
   orcamento_id,
   infoText,
-  exportUrl,
-  exportMdUrl,
+  tituloExport,
 }: Props) {
   const readonly = orcamento_id === undefined;
   const { editCell, editCells, status, erroMsg } = useGradeEditor(orcamento_id);
@@ -186,25 +184,12 @@ export function BudgetGrid({
 
   const rows = useMemo(() => flatten(arvore, expanded), [arvore, expanded]);
 
-  /** Helper de download — busca URL com auth, força save-as. */
-  const baixarUrl = async (url: string, fallbackName: string) => {
-    try {
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const cd = res.headers.get("Content-Disposition") ?? "";
-      const m = cd.match(/filename="?([^";]+)"?/);
-      const name = m?.[1] ?? fallbackName;
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(a.href);
-    } catch (err) {
-      window.alert(`Erro ao exportar: ${String(err)}`);
-    }
+  /** Exports gerados no cliente (sem backend). */
+  const baixarXlsx = () => {
+    baixar(gerarXlsx(arvore, totais_mes, total_geral, tituloExport), "orcamento.xlsx");
+  };
+  const baixarMd = () => {
+    baixar(gerarMd(arvore, tituloExport), "orcamento.md", "text/markdown");
   };
 
   const handleExcluir = useCallback(
@@ -527,24 +512,20 @@ export function BudgetGrid({
             + Conta raiz
           </button>
         )}
-        {exportUrl && (
-          <button
-            onClick={() => baixarUrl(exportUrl, "orcamento.xlsx")}
-            className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
-            title="Baixar XLSX"
-          >
-            ⬇ XLSX
-          </button>
-        )}
-        {exportMdUrl && (
-          <button
-            onClick={() => baixarUrl(exportMdUrl, "orcamento.md")}
-            className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
-            title="Baixar Markdown (importável no XMind)"
-          >
-            📝 MD
-          </button>
-        )}
+        <button
+          onClick={baixarXlsx}
+          className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
+          title="Baixar XLSX"
+        >
+          ⬇ XLSX
+        </button>
+        <button
+          onClick={baixarMd}
+          className="px-3 py-1 text-sm border rounded hover:bg-gray-50"
+          title="Baixar Markdown (importável no XMind)"
+        >
+          📝 MD
+        </button>
         {!readonly && <StatusBadge status={status} />}
         {!readonly && erroMsg && (
           <span className="text-xs text-red-600 truncate max-w-md" title={erroMsg}>

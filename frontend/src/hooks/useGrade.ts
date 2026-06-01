@@ -9,7 +9,7 @@ export function useEmpreendimentos() {
 }
 
 export function useOrcamento(
-  empreendimento_id: number | undefined,
+  empreendimento_id: string | undefined,
   ano: number,
   versao?: number | null,
 ) {
@@ -31,11 +31,11 @@ export function useGrade(orcamento_id: number | undefined) {
 
 export function useGradeConsolidada(
   ano: number,
-  empreendimento_ids: number[],
+  empreendimento_ids: string[],
   enabled = true,
 ) {
   // chave estável independente da ordem dos ids
-  const key = [...empreendimento_ids].sort((a, b) => a - b).join(",");
+  const key = [...empreendimento_ids].sort().join(",");
   return useQuery({
     queryKey: ["grade-consolidada", ano, key],
     queryFn: () => api.consolidado(ano, empreendimento_ids),
