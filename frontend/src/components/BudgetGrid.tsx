@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { gerarXlsx, gerarMd, baixar } from "../api/export";
+import { api } from "../api/client";
 import {
   AllCommunityModule,
   ModuleRegistry,
@@ -162,6 +163,8 @@ interface Props {
   infoText: string;
   /** Título usado nos arquivos exportados (XLSX/MD). */
   tituloExport: string;
+  /** Orçamento das anotações (sempre o individual; undefined no consolidado). */
+  notasOrcamentoId?: number;
 }
 
 export function BudgetGrid({
@@ -171,12 +174,44 @@ export function BudgetGrid({
   orcamento_id,
   infoText,
   tituloExport,
+  notasOrcamentoId,
 }: Props) {
   const readonly = orcamento_id === undefined;
   const { editCell, editCells, status, erroMsg } = useGradeEditor(orcamento_id);
   const excluir = useExcluirConta();
   const [modal, setModal] = useState<ModalState>(null);
   const [erroCrud, setErroCrud] = useState<string | null>(null);
+
+  // Anotações por conta (somente leitura quando readonly)
+  const [notas, setNotas] = useState<Record<number, string>>({});
+  const [notaModal, setNotaModal] = useState<{ contaId: number; codigo: string; nome: string } | null>(null);
+  const [notaText, setNotaText] = useState("");
+  const [notaSaving, setNotaSaving] = useState(false);
+  useEffect(() => {
+    if (notasOrcamentoId === undefined) { setNotas({}); return; }
+    let alive = true;
+    api.getNotas(notasOrcamentoId).then((n) => { if (alive) setNotas(n); }).catch(() => {});
+    return () => { alive = false; };
+  }, [notasOrcamentoId]);
+
+  const salvarNota = async () => {
+    if (!notaModal || notasOrcamentoId === undefined) return;
+    setNotaSaving(true);
+    try {
+      await api.setNota(notasOrcamentoId, notaModal.contaId, notaText);
+      setNotas((prev) => {
+        const next = { ...prev };
+        if (notaText.trim()) next[notaModal.contaId] = notaText.trim();
+        else delete next[notaModal.contaId];
+        return next;
+      });
+      setNotaModal(null);
+    } catch (err) {
+      setErroCrud(String(err).replace(/^Error: /, ""));
+    } finally {
+      setNotaSaving(false);
+    }
+  };
 
   const [expanded, setExpanded] = useState<Set<number>>(() =>
     collectAllIds(arvore),
@@ -346,6 +381,20 @@ export function BudgetGrid({
                   </span>
                 )}
               </span>
+              {notasOrcamentoId !== undefined && !isPinned && (
+                <button
+                  type="button"
+                  title={notas[row.id] ? notas[row.id] : "Adicionar nota"}
+                  onClick={() => {
+                    setNotaText(notas[row.id] ?? "");
+                    setNotaModal({ contaId: row.id, codigo: row.codigo, nome: row.nome });
+                  }}
+                  className="action-btn"
+                  style={{ opacity: notas[row.id] ? 1 : 0.3 }}
+                >
+                  📝
+                </button>
+              )}
               {!isPinned && !readonly && (
                 <span className="row-actions" style={{ display: "inline-flex", gap: 2 }}>
                   {podeAdicionarFilha && (
@@ -406,7 +455,7 @@ export function BudgetGrid({
             : { fontWeight: 600 },
       },
     ];
-  }, [expanded, editCell]);
+  }, [expanded, editCell, notas, notasOrcamentoId]);
 
   const totaisMesRow: Row = useMemo(
     () => ({
@@ -594,6 +643,53 @@ export function BudgetGrid({
           }}
           onClose={() => setModal(null)}
         />
+      )}
+      {notaModal && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}
+          onClick={() => setNotaModal(null)}
+        >
+          <div
+            style={{ background: "#fff", borderRadius: 12, padding: 24, width: 460, maxWidth: "95vw", boxShadow: "0 8px 32px rgba(0,0,0,.2)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>
+              Nota — {notaModal.codigo} {notaModal.nome}
+            </div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
+              {readonly
+                ? "Somente leitura (orçamento não está em rascunho)."
+                : "Anotação visível para a equipe neste orçamento."}
+            </div>
+            <textarea
+              value={notaText}
+              onChange={(e) => setNotaText(e.target.value)}
+              readOnly={readonly}
+              rows={5}
+              placeholder="Ex: premissa usada, fonte do número, pendência…"
+              style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: 10, fontSize: 14, outline: "none", resize: "vertical", boxSizing: "border-box" }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+              <button
+                type="button"
+                onClick={() => setNotaModal(null)}
+                style={{ padding: "8px 14px", fontSize: 14, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", cursor: "pointer" }}
+              >
+                Fechar
+              </button>
+              {!readonly && (
+                <button
+                  type="button"
+                  disabled={notaSaving}
+                  onClick={salvarNota}
+                  style={{ padding: "8px 16px", fontSize: 14, border: 0, borderRadius: 8, background: "#2563eb", color: "#fff", fontWeight: 600, cursor: "pointer", opacity: notaSaving ? 0.6 : 1 }}
+                >
+                  {notaSaving ? "Salvando…" : "Salvar nota"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

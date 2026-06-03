@@ -547,4 +547,38 @@ export const api = {
     if (error) fail(error);
     return data as Orcamento;
   },
+
+  // ── Anotações por linha (conta) de um orçamento ──────────────────────────
+  getNotas: async (orcamento_id: number): Promise<Record<number, string>> => {
+    const { data, error } = await supabase
+      .from("orcamento_notas")
+      .select("conta_id,texto")
+      .eq("orcamento_id", orcamento_id);
+    if (error) fail(error);
+    const map: Record<number, string> = {};
+    for (const r of (data ?? []) as { conta_id: number; texto: string }[]) {
+      map[r.conta_id] = r.texto;
+    }
+    return map;
+  },
+
+  setNota: async (orcamento_id: number, conta_id: number, texto: string): Promise<void> => {
+    const t = texto.trim();
+    if (!t) {
+      const { error } = await supabase
+        .from("orcamento_notas")
+        .delete()
+        .eq("orcamento_id", orcamento_id)
+        .eq("conta_id", conta_id);
+      if (error) fail(error);
+    } else {
+      const { error } = await supabase
+        .from("orcamento_notas")
+        .upsert(
+          { orcamento_id, conta_id, texto: t, updated_at: new Date().toISOString() },
+          { onConflict: "orcamento_id,conta_id" },
+        );
+      if (error) fail(error);
+    }
+  },
 };

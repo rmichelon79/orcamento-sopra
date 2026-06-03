@@ -107,6 +107,7 @@ export default function App() {
   let infoText = "";
   let tituloHeader = "";
   let tituloExport = "";
+  let notasOrcamentoId: number | undefined;
 
   if (isConsolidado) {
     if (!gradeConsolidada.data) {
@@ -143,6 +144,7 @@ export default function App() {
     infoText = `${grade.data.orcamento.ano}/v${grade.data.orcamento.versao} · ${grade.data.orcamento.status}`;
     tituloHeader = empreendimentoAtivo.nome;
     tituloExport = `Orçamento — ${empreendimentoAtivo.codigo} ${empreendimentoAtivo.nome} · ${grade.data.orcamento.ano}/v${grade.data.orcamento.versao} · ${grade.data.orcamento.status}`;
+    notasOrcamentoId = grade.data.orcamento.id;
   }
 
   return (
@@ -230,6 +232,7 @@ export default function App() {
           orcamento_id={gridOrcamentoId}
           infoText={infoText}
           tituloExport={tituloExport}
+          notasOrcamentoId={notasOrcamentoId}
         />
       </main>
 
