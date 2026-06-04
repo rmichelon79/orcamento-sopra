@@ -22,6 +22,9 @@ export function EmpreendimentoFormModal(props: Props) {
   const [ativo, setAtivo] = useState(
     isEdit ? props.empreendimento.ativo : true,
   );
+  const [anoBase, setAnoBase] = useState(
+    isEdit ? (props.empreendimento.ano_base ?? 2026) : 2026,
+  );
   const [erro, setErro] = useState<string | null>(null);
   const codigoRef = useRef<HTMLInputElement>(null);
 
@@ -59,10 +62,10 @@ export function EmpreendimentoFormModal(props: Props) {
       if (isEdit) {
         await atualizar.mutateAsync({
           id: props.empreendimento.id,
-          data: { codigo: codigoTrim, nome: nomeTrim, ativo },
+          data: { codigo: codigoTrim, nome: nomeTrim, ativo, ano_base: anoBase },
         });
       } else {
-        await criar.mutateAsync({ codigo: codigoTrim, nome: nomeTrim });
+        await criar.mutateAsync({ codigo: codigoTrim, nome: nomeTrim, ano_base: anoBase });
       }
       onClose();
     } catch (err) {
@@ -126,6 +129,23 @@ export function EmpreendimentoFormModal(props: Props) {
               maxLength={200}
               placeholder="Nome completo do empreendimento"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ano-base do projeto
+            </label>
+            <input
+              type="number"
+              value={anoBase}
+              onChange={(e) => setAnoBase(Number(e.target.value) || 2026)}
+              className="w-32 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              min={2000}
+              max={2100}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Início do horizonte plurianual (5 anos: {anoBase}–{anoBase + 4}).
+            </p>
           </div>
 
           {isEdit && (

@@ -29,6 +29,18 @@ export function useGrade(orcamento_id: number | undefined) {
   });
 }
 
+export function useGradePlurianual(
+  empreendimento_id: string | undefined,
+  anoBase: number | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["grade-plurianual", empreendimento_id, anoBase],
+    queryFn: () => api.gradePlurianual(empreendimento_id!, anoBase!),
+    enabled: enabled && empreendimento_id !== undefined && anoBase !== undefined && anoBase !== null,
+  });
+}
+
 export function useGradeConsolidada(
   ano: number,
   empreendimento_ids: string[],

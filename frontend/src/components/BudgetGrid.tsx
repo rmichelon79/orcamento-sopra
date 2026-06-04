@@ -165,6 +165,8 @@ interface Props {
   tituloExport: string;
   /** Orçamento das anotações (sempre o individual; undefined no consolidado). */
   notasOrcamentoId?: number;
+  /** Cabeçalhos das colunas de valor (default: 12 meses; 5 anos no modo plurianual). */
+  colunas?: string[];
 }
 
 export function BudgetGrid({
@@ -175,6 +177,7 @@ export function BudgetGrid({
   infoText,
   tituloExport,
   notasOrcamentoId,
+  colunas = MESES,
 }: Props) {
   const readonly = orcamento_id === undefined;
   const { editCell, editCells, status, erroMsg } = useGradeEditor(orcamento_id);
@@ -257,7 +260,7 @@ export function BudgetGrid({
   const collapseAll = () => setExpanded(new Set());
 
   const columnDefs = useMemo<ColDef<Row>[]>(() => {
-    const mesCols: ColDef<Row>[] = MESES.map((m, i) => ({
+    const mesCols: ColDef<Row>[] = colunas.map((m, i) => ({
       headerName: m,
       colId: `mes_${i + 1}`,
       valueGetter: (p: ValueGetterParams<Row>) => {
@@ -455,7 +458,7 @@ export function BudgetGrid({
             : { fontWeight: 600 },
       },
     ];
-  }, [expanded, editCell, notas, notasOrcamentoId]);
+  }, [expanded, editCell, notas, notasOrcamentoId, colunas]);
 
   const totaisMesRow: Row = useMemo(
     () => ({

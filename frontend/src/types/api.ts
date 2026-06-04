@@ -16,6 +16,7 @@ export interface Empreendimento {
   codigo: string;
   nome: string;
   ativo: boolean;
+  ano_base: number | null; // ano inicial do projeto (horizonte de 5 anos)
 }
 
 export interface Conta {

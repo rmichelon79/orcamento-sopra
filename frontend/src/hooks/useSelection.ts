@@ -5,6 +5,7 @@ export interface Selection {
   ano: number;
   versao: number | null;
   modo: "individual" | "consolidado";
+  vista: "ano" | "plurianual"; // só no modo individual
 }
 
 const DEFAULT_ANO = new Date().getFullYear();
@@ -20,6 +21,7 @@ function parseFromUrl(): Selection {
     ano: Number.isFinite(ano) ? ano : DEFAULT_ANO,
     versao: Number.isFinite(versao!) ? versao : null,
     modo,
+    vista: params.get("vista") === "plurianual" ? "plurianual" : "ano",
   };
 }
 
@@ -33,6 +35,9 @@ function writeToUrl(s: Selection) {
   params.set("ano", String(s.ano));
   if (s.versao !== null && s.modo === "individual") {
     params.set("versao", String(s.versao));
+  }
+  if (s.modo === "individual" && s.vista === "plurianual") {
+    params.set("vista", "plurianual");
   }
   const next = "?" + params.toString();
   if (window.location.search !== next) {

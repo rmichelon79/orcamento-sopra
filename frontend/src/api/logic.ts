@@ -103,6 +103,54 @@ export function montarGrade(
   };
 }
 
+/** Monta a grade com N colunas arbitrárias (ex: 5 anos). centsByConta: conta_id → centavos[ncols]. */
+export function montarGradeN(
+  contas: Conta[],
+  centsByConta: Map<number, number[]>,
+  ncols: number,
+): { arvore: GradeNode[]; totais_mes: string[]; total_geral: string } {
+  const byId = new Map<number, Node>();
+  for (const c of contas) {
+    const base = c.natureza === "analitica" ? centsByConta.get(c.id) : undefined;
+    byId.set(c.id, { conta: c, valores: base ? base.slice() : new Array(ncols).fill(0), total: 0, filhas: [] });
+  }
+  const raizes: Node[] = [];
+  for (const c of contas) {
+    const node = byId.get(c.id)!;
+    if (c.parent_id == null) raizes.push(node);
+    else byId.get(c.parent_id)?.filhas.push(node);
+  }
+  const ordenar = (nodes: Node[]) => {
+    nodes.sort((a, b) => cmpNatural(a.conta.codigo, b.conta.codigo));
+    nodes.forEach((n) => ordenar(n.filhas));
+  };
+  ordenar(raizes);
+  const calc = (no: Node): void => {
+    if (no.conta.natureza === "analitica") {
+      no.total = no.valores.reduce((a, b) => a + b, 0);
+      return;
+    }
+    const valores = new Array(ncols).fill(0);
+    for (const f of no.filhas) {
+      calc(f);
+      for (let i = 0; i < ncols; i++) valores[i] += f.valores[i];
+    }
+    no.valores = valores;
+    no.total = valores.reduce((a, b) => a + b, 0);
+  };
+  raizes.forEach(calc);
+  const totais = new Array(ncols).fill(0);
+  for (const r of raizes) {
+    const sinal = r.conta.tipo_orcamentario === "entrada" ? 1 : -1;
+    for (let i = 0; i < ncols; i++) totais[i] += r.valores[i] * sinal;
+  }
+  return {
+    arvore: raizes.map(toGradeNode),
+    totais_mes: totais.map(fromCents),
+    total_geral: fromCents(totais.reduce((a, b) => a + b, 0)),
+  };
+}
+
 const CODIGO_RE = /^\d+(?:\.\d+)*$/;
 export function validarFormatoCodigo(codigo: string): void {
   if (!CODIGO_RE.test(codigo)) {

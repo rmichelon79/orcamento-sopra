@@ -1,11 +1,12 @@
 // Camada de dados — agora client-direct no Supabase (substitui o backend FastAPI).
 // Mantém a MESMA interface do objeto `api` para minimizar mudanças nos hooks/componentes.
 import { supabase } from "./supabase";
-import { montarGrade, toCents, validarFormatoCodigo } from "./logic";
+import { montarGrade, montarGradeN, toCents, validarFormatoCodigo } from "./logic";
 import type {
   Conta,
   Empreendimento,
   GradeConsolidadaResponse,
+  GradeNode,
   GradeResponse,
   LancamentoBulkRequest,
   LancamentoBulkResponse,
@@ -39,12 +40,14 @@ export interface ContaUpdatePayload {
 export interface EmpreendimentoCreatePayload {
   codigo: string;
   nome: string;
+  ano_base?: number | null;
 }
 
 export interface EmpreendimentoUpdatePayload {
   codigo?: string;
   nome?: string;
   ativo?: boolean;
+  ano_base?: number | null;
 }
 
 const NIVEL_MAX = 5;
@@ -59,12 +62,15 @@ interface EmpRow {
   codigo: string;
   nome: string;
   status: string;
+  ano_base: number | null;
 }
+const EMP_COLS = "id,codigo,nome,status,ano_base";
 const empToApi = (r: EmpRow): Empreendimento => ({
   id: r.id,
   codigo: r.codigo,
   nome: r.nome,
   ativo: r.status === "ativo",
+  ano_base: r.ano_base ?? null,
 });
 
 // ─── Helpers de contas (porta de services/contas.py) ─────────────────────────
@@ -206,7 +212,7 @@ export const api = {
   listarEmpreendimentos: async (): Promise<Empreendimento[]> => {
     const { data, error } = await supabase
       .from("empreendimentos")
-      .select("id,codigo,nome,status")
+      .select(EMP_COLS)
       .order("codigo");
     if (error) fail(error);
     return ((data ?? []) as EmpRow[]).map(empToApi);
@@ -245,6 +251,60 @@ export const api = {
     }
     const grade = montarGrade(contas, map);
     return { orcamento: orc, ...grade };
+  },
+
+  // Grade plurianual: 5 colunas (uma por ano). Cria os orçamentos que faltarem.
+  gradePlurianual: async (
+    empreendimento_id: string,
+    anoBase: number,
+    nAnos = 5,
+  ): Promise<{
+    anos: number[];
+    arvore: GradeNode[];
+    totais_mes: string[];
+    total_geral: string;
+    orcamentoIds: number[];
+  }> => {
+    const anos = Array.from({ length: nAnos }, (_, i) => anoBase + i);
+    const orcamentoIds: number[] = [];
+    for (const ano of anos) {
+      const { data } = await supabase
+        .from("orcamentos")
+        .select("id")
+        .eq("empreendimento_id", empreendimento_id)
+        .eq("ano", ano)
+        .order("versao", { ascending: false })
+        .limit(1);
+      let id = (data?.[0] as { id: number } | undefined)?.id;
+      if (!id) {
+        const { data: novo, error } = await supabase
+          .from("orcamentos")
+          .insert({ empreendimento_id, ano, versao: 1, status: "rascunho" })
+          .select("id")
+          .single();
+        if (error) fail(error);
+        id = (novo as { id: number }).id;
+      }
+      orcamentoIds.push(id);
+    }
+
+    const contas = await fetchContas();
+    const { data: lancs } = await supabase
+      .from("lancamentos")
+      .select("orcamento_id,conta_id,valor")
+      .in("orcamento_id", orcamentoIds);
+    const idxByOrc = new Map<number, number>();
+    orcamentoIds.forEach((id, i) => idxByOrc.set(id, i));
+    const centsByConta = new Map<number, number[]>();
+    for (const l of (lancs ?? []) as { orcamento_id: number; conta_id: number; valor: string }[]) {
+      const i = idxByOrc.get(l.orcamento_id);
+      if (i === undefined) continue;
+      let arr = centsByConta.get(l.conta_id);
+      if (!arr) { arr = new Array(nAnos).fill(0); centsByConta.set(l.conta_id, arr); }
+      arr[i] += toCents(l.valor);
+    }
+    const grade = montarGradeN(contas, centsByConta, nAnos);
+    return { anos, ...grade, orcamentoIds };
   },
 
   bulkLancamentos: async (req: LancamentoBulkRequest): Promise<LancamentoBulkResponse> => {
@@ -407,8 +467,8 @@ export const api = {
   criarEmpreendimento: async (data: EmpreendimentoCreatePayload): Promise<Empreendimento> => {
     const { data: ins, error } = await supabase
       .from("empreendimentos")
-      .insert({ codigo: data.codigo, nome: data.nome })
-      .select("id,codigo,nome,status")
+      .insert({ codigo: data.codigo, nome: data.nome, ano_base: data.ano_base ?? 2026 })
+      .select(EMP_COLS)
       .single();
     if (error) fail(error);
     return empToApi(ins as EmpRow);
@@ -422,11 +482,12 @@ export const api = {
     if (data.codigo != null) patch.codigo = data.codigo;
     if (data.nome != null) patch.nome = data.nome;
     if (data.ativo != null) patch.status = data.ativo ? "ativo" : "inativo";
+    if (data.ano_base != null) patch.ano_base = data.ano_base;
     const { data: upd, error } = await supabase
       .from("empreendimentos")
       .update(patch)
       .eq("id", id)
-      .select("id,codigo,nome,status")
+      .select(EMP_COLS)
       .single();
     if (error) fail(error);
     return empToApi(upd as EmpRow);
