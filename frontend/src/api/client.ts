@@ -534,7 +534,7 @@ export const api = {
     const patch: Record<string, unknown> = {};
     if (data.codigo != null) patch.codigo = data.codigo;
     if (data.nome != null) patch.nome = data.nome;
-    if (data.ativo != null) patch.status = data.ativo ? "ativo" : "inativo";
+    if (data.ativo != null) patch.status = data.ativo ? "ativo" : "concluido";
     if (data.ano_base != null) patch.ano_base = data.ano_base;
     const { data: upd, error } = await supabase
       .from("empreendimentos")
