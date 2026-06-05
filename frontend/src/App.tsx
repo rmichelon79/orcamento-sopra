@@ -11,6 +11,7 @@ import {
   useEmpreendimentos,
   useGrade,
   useGradeConsolidada,
+  useGradeConsolidadaPlurianual,
   useGradePlurianual,
   useOrcamento,
 } from "./hooks/useGrade";
@@ -63,15 +64,27 @@ export default function App() {
   const gradeConsolidada = useGradeConsolidada(
     selection.ano,
     consolidado.ids,
-    selection.modo === "consolidado",
+    selection.modo === "consolidado" && selection.vista !== "plurianual",
   );
 
-  const isPlurianual =
-    selection.modo === "individual" && selection.vista === "plurianual";
+  const isPlurianual = selection.vista === "plurianual";
+  const isPlurianualInd = selection.modo === "individual" && isPlurianual;
+  const isPlurianualCons = selection.modo === "consolidado" && isPlurianual;
   const plurianual = useGradePlurianual(
     empreendimentoAtivo?.id,
     empreendimentoAtivo?.ano_base ?? undefined,
-    isPlurianual,
+    isPlurianualInd,
+  );
+  const anoBaseConsol = (() => {
+    const bases = (empreendimentos.data ?? [])
+      .filter((e) => consolidado.ids.includes(e.id) && e.ano_base != null)
+      .map((e) => e.ano_base as number);
+    return bases.length ? Math.min(...bases) : selection.ano;
+  })();
+  const consolPlurianual = useGradeConsolidadaPlurianual(
+    consolidado.ids,
+    anoBaseConsol,
+    isPlurianualCons,
   );
 
   // estados de loading separados por modo
@@ -83,7 +96,8 @@ export default function App() {
         : orcamento.isLoading || grade.isLoading));
   const isLoadingConsolidado =
     selection.modo === "consolidado" &&
-    (empreendimentos.isLoading || gradeConsolidada.isLoading);
+    (empreendimentos.isLoading ||
+      (isPlurianualCons ? consolPlurianual.isLoading : gradeConsolidada.isLoading));
 
   if (isLoadingIndividual || isLoadingConsolidado) {
     return (
@@ -96,8 +110,9 @@ export default function App() {
   const erro =
     selection.modo === "individual"
       ? (empreendimentos.error ??
-        (isPlurianual ? plurianual.error : (orcamento.error ?? grade.error)))
-      : (empreendimentos.error ?? gradeConsolidada.error);
+        (isPlurianualInd ? plurianual.error : (orcamento.error ?? grade.error)))
+      : (empreendimentos.error ??
+        (isPlurianualCons ? consolPlurianual.error : gradeConsolidada.error));
   if (erro) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -123,7 +138,24 @@ export default function App() {
   let notasOrcamentoId: number | undefined;
   let colunas: string[] | undefined;
 
-  if (isConsolidado) {
+  if (isConsolidado && isPlurianualCons) {
+    if (!consolPlurianual.data) {
+      return (
+        <div className="h-full flex items-center justify-center text-gray-500">
+          Sem dados.
+        </div>
+      );
+    }
+    const gc = consolPlurianual.data;
+    gridArvore = gc.arvore;
+    gridTotaisMes = gc.totais_mes;
+    gridTotalGeral = gc.total_geral;
+    gridOrcamentoId = undefined;
+    colunas = gc.anos.map(String);
+    infoText = `${gc.anos[0]}–${gc.anos[gc.anos.length - 1]} · consolidado plurianual · ${gc.empreendimentos_incluidos.length} empreendimentos`;
+    tituloHeader = "Consolidado";
+    tituloExport = `Consolidado plurianual · ${gc.anos[0]}–${gc.anos[gc.anos.length - 1]}`;
+  } else if (isConsolidado) {
     if (!gradeConsolidada.data) {
       return (
         <div className="h-full flex items-center justify-center text-gray-500">
@@ -139,7 +171,7 @@ export default function App() {
     infoText = `${g.ano} · soma de ${g.empreendimentos_incluidos.length} empreendimentos`;
     tituloHeader = "Consolidado";
     tituloExport = `Orçamento Consolidado · ${g.ano} · soma de ${g.empreendimentos_incluidos.length} empreendimentos`;
-  } else if (isPlurianual) {
+  } else if (isPlurianualInd) {
     if (!plurianual.data || !empreendimentoAtivo) {
       return (
         <div className="h-full flex items-center justify-center text-gray-500">
@@ -153,7 +185,7 @@ export default function App() {
     gridTotalGeral = gp.total_geral;
     gridOrcamentoId = undefined;
     colunas = gp.anos.map(String);
-    infoText = `${gp.anos[0]}–${gp.anos[gp.anos.length - 1]} · visão plurianual (5 anos) · só leitura`;
+    infoText = `${gp.anos[0]}–${gp.anos[gp.anos.length - 1]} · visão plurianual (7 anos) · só leitura`;
     tituloHeader = empreendimentoAtivo.nome;
     tituloExport = `Orçamento plurianual — ${empreendimentoAtivo.codigo} ${empreendimentoAtivo.nome} · ${gp.anos[0]}–${gp.anos[gp.anos.length - 1]}`;
   } else {
@@ -199,16 +231,16 @@ export default function App() {
           }}
         />
         <span className="text-sm text-gray-500">{tituloHeader}</span>
-        {!isConsolidado && empreendimentoAtivo && (
+        {(empreendimentoAtivo || isConsolidado) && (
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded border overflow-hidden text-sm">
               <button
                 type="button"
                 className={`px-3 py-1 ${!isPlurianual ? "bg-blue-600 text-white" : "bg-white hover:bg-gray-50"}`}
                 onClick={() => {
-                  const base = empreendimentoAtivo.ano_base;
+                  const base = empreendimentoAtivo?.ano_base;
                   const ano =
-                    base != null && (selection.ano < base || selection.ano > base + 4)
+                    !isConsolidado && base != null && (selection.ano < base || selection.ano > base + 6)
                       ? base
                       : selection.ano;
                   update({ vista: "ano", ano });
@@ -221,16 +253,16 @@ export default function App() {
                 className={`px-3 py-1 ${isPlurianual ? "bg-blue-600 text-white" : "bg-white hover:bg-gray-50"}`}
                 onClick={() => update({ vista: "plurianual" })}
               >
-                5 Anos
+                7 Anos
               </button>
             </div>
-            {!isPlurianual && empreendimentoAtivo.ano_base != null && (
+            {!isPlurianual && !isConsolidado && empreendimentoAtivo?.ano_base != null && (
               <select
                 className="text-sm border rounded px-2 py-1 bg-white"
                 value={selection.ano}
                 onChange={(e) => update({ ano: Number(e.target.value), versao: null })}
               >
-                {Array.from({ length: 5 }, (_, i) => empreendimentoAtivo.ano_base! + i).map(
+                {Array.from({ length: 7 }, (_, i) => empreendimentoAtivo.ano_base! + i).map(
                   (a) => (
                     <option key={a} value={a}>
                       {a}

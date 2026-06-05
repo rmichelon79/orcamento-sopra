@@ -41,6 +41,19 @@ export function useGradePlurianual(
   });
 }
 
+export function useGradeConsolidadaPlurianual(
+  empreendimento_ids: string[],
+  anoBase: number | undefined,
+  enabled = true,
+) {
+  const key = [...empreendimento_ids].sort().join(",");
+  return useQuery({
+    queryKey: ["grade-consol-plurianual", anoBase, key],
+    queryFn: () => api.gradeConsolidadaPlurianual(empreendimento_ids, anoBase!),
+    enabled: enabled && empreendimento_ids.length > 0 && anoBase !== undefined && anoBase !== null,
+  });
+}
+
 export function useGradeConsolidada(
   ano: number,
   empreendimento_ids: string[],

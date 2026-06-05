@@ -257,7 +257,7 @@ export const api = {
   gradePlurianual: async (
     empreendimento_id: string,
     anoBase: number,
-    nAnos = 5,
+    nAnos = 7,
   ): Promise<{
     anos: number[];
     arvore: GradeNode[];
@@ -305,6 +305,59 @@ export const api = {
     }
     const grade = montarGradeN(contas, centsByConta, nAnos);
     return { anos, ...grade, orcamentoIds };
+  },
+
+  // Consolidado plurianual: soma de vários empreendimentos × N anos (só leitura).
+  gradeConsolidadaPlurianual: async (
+    empreendimento_ids: string[],
+    anoBase: number,
+    nAnos = 7,
+  ): Promise<{
+    anos: number[];
+    arvore: GradeNode[];
+    totais_mes: string[];
+    total_geral: string;
+    empreendimentos_incluidos: string[];
+  }> => {
+    const anos = Array.from({ length: nAnos }, (_, i) => anoBase + i);
+    const { data: orcs } = await supabase
+      .from("orcamentos")
+      .select("id,empreendimento_id,ano,versao")
+      .in("empreendimento_id", empreendimento_ids)
+      .in("ano", anos);
+    // versão mais recente por (empreendimento, ano)
+    const best = new Map<string, { id: number; versao: number }>();
+    for (const o of (orcs ?? []) as { id: number; empreendimento_id: string; ano: number; versao: number }[]) {
+      const k = `${o.empreendimento_id}|${o.ano}`;
+      const cur = best.get(k);
+      if (!cur || o.versao > cur.versao) best.set(k, { id: o.id, versao: o.versao });
+    }
+    const yearByOrc = new Map<number, number>();
+    const incluidos = new Set<string>();
+    for (const [k, v] of best) {
+      const [emp, ano] = k.split("|");
+      yearByOrc.set(v.id, anos.indexOf(Number(ano)));
+      incluidos.add(emp);
+    }
+
+    const contas = await fetchContas();
+    const centsByConta = new Map<number, number[]>();
+    const orcIds = [...yearByOrc.keys()];
+    if (orcIds.length) {
+      const { data: lancs } = await supabase
+        .from("lancamentos")
+        .select("orcamento_id,conta_id,valor")
+        .in("orcamento_id", orcIds);
+      for (const l of (lancs ?? []) as { orcamento_id: number; conta_id: number; valor: string }[]) {
+        const yi = yearByOrc.get(l.orcamento_id);
+        if (yi === undefined || yi < 0) continue;
+        let arr = centsByConta.get(l.conta_id);
+        if (!arr) { arr = new Array(nAnos).fill(0); centsByConta.set(l.conta_id, arr); }
+        arr[yi] += toCents(l.valor);
+      }
+    }
+    const grade = montarGradeN(contas, centsByConta, nAnos);
+    return { anos, ...grade, empreendimentos_incluidos: [...incluidos] };
   },
 
   bulkLancamentos: async (req: LancamentoBulkRequest): Promise<LancamentoBulkResponse> => {
