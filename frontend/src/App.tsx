@@ -302,7 +302,7 @@ export default function App() {
           type="button"
           onClick={async () => {
             await supabase.auth.signOut();
-            location.reload();
+            location.href = 'https://rmichelon79.github.io/sopra-portal/';
           }}
           className="px-3 py-1.5 text-sm border rounded bg-white hover:bg-gray-50 text-gray-500"
           title="Sair"
