@@ -300,6 +300,14 @@ export default function App() {
         </button>
         <button
           type="button"
+          onClick={() => { location.href = 'https://rmichelon79.github.io/sopra-portal/'; }}
+          className="px-3 py-1.5 text-sm border rounded bg-white hover:bg-gray-50"
+          title="Voltar ao Portal (continua logado)"
+        >
+          ⌂ Portal
+        </button>
+        <button
+          type="button"
           onClick={async () => {
             await supabase.auth.signOut();
             location.href = 'https://rmichelon79.github.io/sopra-portal/';
