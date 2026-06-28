@@ -282,6 +282,7 @@ export function BudgetGrid({
       width: 130,
       editable: (p) => !readonly && p.data?.natureza === "analitica",
       cellStyle: (p): CellStyle | undefined => {
+        if (p.data?.id === -1) return undefined; // linha Total geral: usa o estilo escuro da linha
         if (p.data?.natureza === "sintetica") {
           return { fontWeight: 600, background: "#f3f4f6" };
         }
@@ -453,7 +454,9 @@ export function BudgetGrid({
         width: 170,
         editable: false,
         cellStyle: (p): CellStyle =>
-          p.data?.natureza === "sintetica"
+          p.data?.id === -1
+            ? { fontWeight: 700 }
+            : p.data?.natureza === "sintetica"
             ? { fontWeight: 700, background: "#e5e7eb" }
             : { fontWeight: 600 },
       },
@@ -618,7 +621,7 @@ export function BudgetGrid({
           pinnedBottomRowData={[totaisMesRow]}
           getRowStyle={(p) =>
             p.node.rowPinned === "bottom"
-              ? { fontWeight: 700, background: "#1f2937", color: "#fff" }
+              ? { fontWeight: 700, background: "#000", color: "#fff" }
               : undefined
           }
         />
