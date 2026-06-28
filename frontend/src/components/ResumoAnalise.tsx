@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { useEmpreendimentos, useGradeConsolidadaPlurianual } from "../hooks/useGrade";
 import { useConsolidadoSelecionados, ConsolidadoSelectorModal } from "./ConsolidadoSelector";
@@ -11,83 +11,27 @@ const fmt = (v: string | number | null | undefined): string => {
   return Number.isFinite(n) ? nf.format(Math.round(n)) : "";
 };
 
-/** Achata a árvore mantendo apenas níveis 1 e 2, na ordem da hierarquia. */
-function flatNivel2(nodes: GradeNode[], out: GradeNode[] = []): GradeNode[] {
+/** Mapa id -> nó (achatando a árvore). */
+function buildById(nodes: GradeNode[], map: Map<number, GradeNode> = new Map()): Map<number, GradeNode> {
   for (const n of nodes) {
-    if (n.nivel <= 2) out.push(n);
-    if (n.nivel < 2) flatNivel2(n.filhas ?? [], out);
+    map.set(n.id, n);
+    buildById(n.filhas ?? [], map);
   }
-  return out;
+  return map;
 }
 
-function ResumoTabela({
-  titulo,
-  subtitulo,
-  arvore,
-  anos,
-  totais,
-  totalGeral,
-}: {
-  titulo: string;
-  subtitulo?: string;
-  arvore: GradeNode[];
-  anos: number[];
-  totais: string[];
-  totalGeral: string;
-}) {
-  const rows = flatNivel2(arvore);
-  return (
-    <div className="mb-10">
-      <div className="text-base font-bold text-gray-900">{titulo}</div>
-      {subtitulo && <div className="text-xs text-gray-500 mb-2">{subtitulo}</div>}
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="bg-gray-100 text-gray-600 text-xs uppercase">
-            <th className="text-left p-2">Conta</th>
-            {anos.map((a) => (
-              <th key={a} className="text-right p-2">{a}</th>
-            ))}
-            <th className="text-right p-2">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((n) => {
-            const isRoot = n.nivel === 1;
-            const total = n.valores.reduce((s, v) => s + Number(v || 0), 0);
-            return (
-              <tr key={n.id} className={isRoot ? "font-bold border-t border-gray-300" : "text-gray-700"}>
-                <td className="p-2" style={{ paddingLeft: (n.nivel - 1) * 18 + 8 }}>
-                  {n.nome}
-                </td>
-                {n.valores.map((v, i) => (
-                  <td key={i} className="text-right p-2 tabular-nums">{fmt(v)}</td>
-                ))}
-                <td className="text-right p-2 tabular-nums">{fmt(total)}</td>
-              </tr>
-            );
-          })}
-          <tr style={{ background: "#000", color: "#fff", fontWeight: 700 }}>
-            <td className="p-2">Total geral</td>
-            {totais.map((v, i) => (
-              <td key={i} className="text-right p-2 tabular-nums">{fmt(v)}</td>
-            ))}
-            <td className="text-right p-2 tabular-nums">{fmt(totalGeral)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-}
+type Linha = { node: GradeNode; nivel: number };
 
 /**
- * Aba de Resumo (análise): consolidado + detalhamento por empreendimento,
- * todos em nível 2, por ano. Somente leitura.
+ * Resumo (análise) por ano: empreendimentos nas colunas, contas nas linhas.
+ * Só a raiz de despesas (saída) é detalhada em nível 2; as demais raízes em nível 1.
  */
 export function ResumoAnalise({ onClose }: { onClose: () => void }) {
   const emps = useEmpreendimentos();
   const lista = emps.data ?? [];
   const consol = useConsolidadoSelecionados(lista);
   const [selOpen, setSelOpen] = useState(false);
+  const [anoIdx, setAnoIdx] = useState(0);
 
   const anoBase = useMemo(() => {
     const bases = lista
@@ -98,7 +42,6 @@ export function ResumoAnalise({ onClose }: { onClose: () => void }) {
 
   const cons = useGradeConsolidadaPlurianual(consol.ids, anoBase, consol.ids.length > 0);
 
-  // Grade plurianual de cada empreendimento selecionado, alinhada ao mesmo ano-base
   const porEmp = useQueries({
     queries: consol.ids.map((id) => ({
       queryKey: ["gradePlurianual", id, anoBase],
@@ -108,24 +51,39 @@ export function ResumoAnalise({ onClose }: { onClose: () => void }) {
   });
 
   const anos = cons.data?.anos ?? Array.from({ length: 7 }, (_, i) => anoBase + i);
+  useEffect(() => {
+    if (anoIdx > anos.length - 1) setAnoIdx(0);
+  }, [anos.length, anoIdx]);
+
   const carregando = cons.isLoading || porEmp.some((q) => q.isLoading);
 
-  const nomeEmp = (id: string) => {
-    const e = lista.find((x) => x.id === id);
-    return e ? `${e.codigo} — ${e.nome}` : id;
-  };
+  // Linhas: cada raiz (nível 1); a raiz de saída (despesas) detalha o nível 2.
+  const linhas: Linha[] = useMemo(() => {
+    if (!cons.data) return [];
+    const out: Linha[] = [];
+    for (const root of cons.data.arvore) {
+      out.push({ node: root, nivel: 1 });
+      if (root.tipo_orcamentario === "saida") {
+        for (const c of root.filhas ?? []) out.push({ node: c, nivel: 2 });
+      }
+    }
+    return out;
+  }, [cons.data]);
+
+  const consById = useMemo(() => (cons.data ? buildById(cons.data.arvore) : new Map()), [cons.data]);
+  const empById = useMemo(
+    () => porEmp.map((q) => (q.data ? buildById(q.data.arvore) : new Map<number, GradeNode>())),
+    [porEmp],
+  );
+
+  const nomeEmp = (id: string) => lista.find((x) => x.id === id)?.codigo ?? id;
+  const cell = (map: Map<number, GradeNode>, id: number) => fmt(map.get(id)?.valores[anoIdx]);
 
   return (
     <div className="fixed inset-0 z-40 bg-white flex flex-col">
       <header className="flex items-center gap-3 border-b px-6 py-3 shrink-0">
-        <div className="font-semibold text-gray-800">
-          📊 Resumo (análise) — nível 2 · por ano
-        </div>
-        <button
-          type="button"
-          onClick={() => setSelOpen(true)}
-          className="text-sm text-blue-600 hover:underline"
-        >
+        <div className="font-semibold text-gray-800">📊 Resumo (análise) — por ano</div>
+        <button type="button" onClick={() => setSelOpen(true)} className="text-sm text-blue-600 hover:underline">
           Selecionar empreendimentos
         </button>
         <button
@@ -137,40 +95,66 @@ export function ResumoAnalise({ onClose }: { onClose: () => void }) {
         </button>
       </header>
 
-      <div className="flex-1 min-h-0 overflow-auto p-6">
-        {consol.ids.length === 0 ? (
-          <div className="text-gray-500">Selecione ao menos um empreendimento para o resumo.</div>
-        ) : carregando ? (
-          <div className="text-gray-500">Carregando…</div>
-        ) : (
-          <>
-            {cons.data && (
-              <ResumoTabela
-                titulo={`Consolidado — ${consol.ids.length} empreendimento${consol.ids.length > 1 ? "s" : ""}`}
-                subtitulo={`${anos[0]}–${anos[anos.length - 1]} · soma de ${consol.ids.map(nomeEmp).join(", ")}`}
-                arvore={cons.data.arvore}
-                anos={anos}
-                totais={cons.data.totais_mes}
-                totalGeral={cons.data.total_geral}
-              />
-            )}
-            {consol.ids.map((id, i) => {
-              const d = porEmp[i]?.data;
-              if (!d) return null;
-              return (
-                <ResumoTabela
-                  key={id}
-                  titulo={nomeEmp(id)}
-                  arvore={d.arvore}
-                  anos={d.anos ?? anos}
-                  totais={d.totais_mes}
-                  totalGeral={d.total_geral}
-                />
-              );
-            })}
-          </>
-        )}
-      </div>
+      {consol.ids.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center text-gray-500">
+          Selecione ao menos um empreendimento para o resumo.
+        </div>
+      ) : carregando ? (
+        <div className="flex-1 flex items-center justify-center text-gray-500">Carregando…</div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-auto p-6">
+          {/* seletor de ano */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <span className="text-sm text-gray-500">Ano:</span>
+            {anos.map((a, i) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => setAnoIdx(i)}
+                className={`px-3 py-1 text-sm rounded border ${
+                  i === anoIdx ? "bg-blue-600 text-white border-blue-600" : "bg-white hover:bg-gray-50"
+                }`}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+
+          <table className="text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-100 text-gray-600 text-xs uppercase">
+                <th className="text-left p-2 sticky left-0 bg-gray-100">Conta ({anos[anoIdx]})</th>
+                {consol.ids.map((id) => (
+                  <th key={id} className="text-right p-2 min-w-28">{nomeEmp(id)}</th>
+                ))}
+                <th className="text-right p-2 min-w-28 border-l">Consolidado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map(({ node, nivel }) => (
+                <tr key={node.id} className={nivel === 1 ? "font-bold border-t border-gray-300" : "text-gray-700"}>
+                  <td className="p-2 sticky left-0 bg-white" style={{ paddingLeft: (nivel - 1) * 18 + 8 }}>
+                    {node.nome}
+                  </td>
+                  {consol.ids.map((id, i) => (
+                    <td key={id} className="text-right p-2 tabular-nums">{cell(empById[i], node.id)}</td>
+                  ))}
+                  <td className="text-right p-2 tabular-nums border-l">{cell(consById, node.id)}</td>
+                </tr>
+              ))}
+              <tr style={{ background: "#000", color: "#fff", fontWeight: 700 }}>
+                <td className="p-2 sticky left-0" style={{ background: "#000" }}>Total geral</td>
+                {consol.ids.map((id, i) => (
+                  <td key={id} className="text-right p-2 tabular-nums">
+                    {fmt(porEmp[i]?.data?.totais_mes[anoIdx])}
+                  </td>
+                ))}
+                <td className="text-right p-2 tabular-nums border-l">{fmt(cons.data?.totais_mes[anoIdx])}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {selOpen && (
         <ConsolidadoSelectorModal
