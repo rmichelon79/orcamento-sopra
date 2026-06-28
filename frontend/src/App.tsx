@@ -7,6 +7,7 @@ import {
 } from "./components/ConsolidadoSelector";
 import { GerenciarEmpreendimentosModal } from "./components/GerenciarEmpreendimentosModal";
 import { VersaoSelector } from "./components/VersaoSelector";
+import { ResumoAnalise } from "./components/ResumoAnalise";
 import {
   useEmpreendimentos,
   useGrade,
@@ -23,6 +24,7 @@ export default function App() {
   const { selection, update } = useSelection();
   const empreendimentos = useEmpreendimentos();
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [resumoOpen, setResumoOpen] = useState(false);
   const [gerenciarOpen, setGerenciarOpen] = useState(false);
 
   const empreendimentoAtivo = useMemo(() => {
@@ -292,6 +294,14 @@ export default function App() {
         )}
         <button
           type="button"
+          onClick={() => setResumoOpen(true)}
+          className="px-3 py-1.5 text-sm border rounded bg-white hover:bg-gray-50"
+          title="Resumo consolidado por ano (análise, nível 2)"
+        >
+          📊 Resumo
+        </button>
+        <button
+          type="button"
           onClick={() => setGerenciarOpen(true)}
           className="ml-auto px-3 py-1.5 text-sm border rounded bg-white hover:bg-gray-50"
           title="Gerenciar empreendimentos"
@@ -358,6 +368,8 @@ export default function App() {
           onClose={() => setSelectorOpen(false)}
         />
       )}
+
+      {resumoOpen && <ResumoAnalise onClose={() => setResumoOpen(false)} />}
       {gerenciarOpen && (
         <GerenciarEmpreendimentosModal
           empreendimentos={empreendimentosLista}
