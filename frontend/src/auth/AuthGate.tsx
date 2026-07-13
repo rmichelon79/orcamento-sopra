@@ -77,7 +77,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             <div className="text-xs font-semibold tracking-widest text-gray-400 uppercase">
               Sopra Incorporações
             </div>
-            <div className="text-2xl font-bold text-gray-900">Orçamento</div>
+            <div className="text-2xl font-bold text-gray-900 font-serif">Orçamento</div>
             <div className="text-sm text-gray-500 mt-1">Login único Sopra</div>
           </div>
           {erro && (

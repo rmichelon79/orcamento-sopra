@@ -87,7 +87,7 @@ export function EmpreendimentoFormModal(props: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">{titulo}</h2>
+          <h2 className="text-lg font-semibold text-gray-900 font-serif">{titulo}</h2>
           <button
             type="button"
             onClick={onClose}

@@ -215,7 +215,7 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col">
       <header className="border-b bg-white px-6 py-3 flex items-center gap-4">
-        <h1 className="text-lg font-semibold text-gray-900">Orçamento</h1>
+        <h1 className="text-lg font-semibold text-gray-900 font-serif">Orçamento</h1>
         <EmpreendimentoSelector
           empreendimentos={empreendimentosLista}
           selectedCodigo={empreendimentoAtivo?.codigo ?? null}
