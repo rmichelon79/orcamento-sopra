@@ -15,6 +15,7 @@ import {
   useGradeConsolidadaPlurianual,
   useGradePlurianual,
   useOrcamento,
+  useSaldoInicial,
 } from "./hooks/useGrade";
 import { useVersoes } from "./hooks/useOrcamentoMutations";
 import { useSelection } from "./hooks/useSelection";
@@ -88,6 +89,10 @@ export default function App() {
     anoBaseConsol,
     isPlurianualCons,
   );
+
+  // Fluxo de caixa: só nas vistas mensais (12 meses). Saldo inicial por ano (empresa).
+  const mostrarFluxo = !isPlurianual;
+  const saldoInicial = useSaldoInicial(mostrarFluxo ? selection.ano : undefined);
 
   // estados de loading separados por modo
   const isLoadingIndividual =
@@ -357,6 +362,10 @@ export default function App() {
           tituloExport={tituloExport}
           notasOrcamentoId={notasOrcamentoId}
           colunas={colunas}
+          mostrarFluxoBanco={mostrarFluxo}
+          anoFluxo={selection.ano}
+          saldoInicial={saldoInicial.valor}
+          onSaldoInicialChange={(v) => saldoInicial.salvar.mutate(v)}
         />
       </main>
 

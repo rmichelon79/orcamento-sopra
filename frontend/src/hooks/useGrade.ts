@@ -1,5 +1,21 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
+
+/** Saldo inicial do banco por ano (fluxo de caixa, único da empresa). */
+export function useSaldoInicial(ano: number | undefined) {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["saldoInicial", ano],
+    queryFn: () => api.getSaldoInicial(ano as number),
+    enabled: ano !== undefined,
+  });
+  const salvar = useMutation({
+    mutationFn: (valor: number) => api.setSaldoInicial(ano as number, valor),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["saldoInicial", ano] }),
+  });
+  return { valor: query.data ?? 0, salvar };
+}
 
 export function useEmpreendimentos() {
   return useQuery({

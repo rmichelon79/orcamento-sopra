@@ -183,6 +183,14 @@ interface Props {
   notasOrcamentoId?: number;
   /** Cabeçalhos das colunas de valor (default: 12 meses; 5 anos no modo plurianual). */
   colunas?: string[];
+  /** Mostra a linha de saldo em banco (acumulado) + input de saldo inicial. Só nas vistas mensais. */
+  mostrarFluxoBanco?: boolean;
+  /** Ano do fluxo (para o input de saldo inicial). */
+  anoFluxo?: number;
+  /** Saldo inicial do banco no início do ano (empresa). */
+  saldoInicial?: number;
+  /** Persiste o novo saldo inicial. */
+  onSaldoInicialChange?: (valor: number) => void;
 }
 
 export function BudgetGrid({
@@ -194,6 +202,10 @@ export function BudgetGrid({
   tituloExport,
   notasOrcamentoId,
   colunas = MESES,
+  mostrarFluxoBanco = false,
+  anoFluxo,
+  saldoInicial = 0,
+  onSaldoInicialChange,
 }: Props) {
   const readonly = orcamento_id === undefined;
   const { editCell, editCells, status, erroMsg } = useGradeEditor(orcamento_id);
@@ -298,6 +310,8 @@ export function BudgetGrid({
       width: 130,
       editable: (p) => !readonly && p.data?.natureza === "analitica",
       cellStyle: (p): CellStyle | undefined => {
+        if (p.data?.id === -2)
+          return Number(p.value) < 0 ? { color: "#DC2626" } : undefined; // saldo em banco: negativo em vermelho
         if (p.data?.id === -1) return undefined; // linha Total geral: usa o estilo escuro da linha
         if (p.data?.natureza === "sintetica") {
           return { fontWeight: 600, background: "#f3f4f6" };
@@ -470,7 +484,9 @@ export function BudgetGrid({
         width: 170,
         editable: false,
         cellStyle: (p): CellStyle =>
-          p.data?.id === -1
+          p.data?.id === -2
+            ? { fontWeight: 700, color: Number(p.value) < 0 ? "#DC2626" : "#3E571A" }
+            : p.data?.id === -1
             ? { fontWeight: 700 }
             : p.data?.natureza === "sintetica"
             ? { fontWeight: 700, background: "#e5e7eb" }
@@ -496,6 +512,35 @@ export function BudgetGrid({
       valores: totais_mes,
     }),
     [total_geral, totais_mes],
+  );
+
+  // Saldo em banco (acumulado): saldo inicial + soma corrente dos saldos mensais.
+  const saldoAcumRow: Row = useMemo(() => {
+    let acc = saldoInicial;
+    const valores = totais_mes.map((v) => {
+      acc += Number(v) || 0;
+      return String(acc);
+    });
+    return {
+      id: -2,
+      codigo: "",
+      nome: "Saldo em banco (acumulado)",
+      natureza: "sintetica",
+      tipo: "receita",
+      ativo: true,
+      nivel: 0,
+      parent_id: null,
+      tipo_orcamentario: "entrada",
+      depth: 0,
+      hasChildren: false,
+      total: String(saldoInicial + (Number(total_geral) || 0)),
+      valores,
+    };
+  }, [saldoInicial, totais_mes, total_geral]);
+
+  const pinnedBottom = useMemo(
+    () => (mostrarFluxoBanco ? [totaisMesRow, saldoAcumRow] : [totaisMesRow]),
+    [mostrarFluxoBanco, totaisMesRow, saldoAcumRow],
   );
 
   /**
@@ -619,7 +664,39 @@ export function BudgetGrid({
             </button>
           </span>
         )}
-        <span className="ml-auto text-sm text-gray-500">
+        {mostrarFluxoBanco && (
+          <label className="flex items-center gap-1.5 text-sm text-gray-600 ml-auto">
+            <span className="whitespace-nowrap">
+              💰 Saldo inicial do banco{anoFluxo ? ` (${anoFluxo})` : ""}
+            </span>
+            <input
+              key={`saldo-${anoFluxo}-${saldoInicial}`}
+              type="text"
+              inputMode="decimal"
+              defaultValue={saldoInicial.toLocaleString("pt-BR", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              }}
+              onBlur={(e) => {
+                const v = parseNumber(e.target.value);
+                const ok = Number.isFinite(v);
+                if (ok && v !== saldoInicial) onSaldoInicialChange?.(v);
+                e.target.value = (ok ? v : saldoInicial).toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                });
+              }}
+              className="w-32 text-right border border-gray-300 rounded px-2 py-1 text-sm"
+              title="Saldo em conta no início do ano — base do fluxo de caixa acumulado"
+            />
+          </label>
+        )}
+        <span
+          className={`${mostrarFluxoBanco ? "" : "ml-auto"} text-sm text-gray-500`}
+        >
           {rows.length} linhas visíveis · {infoText}
         </span>
       </div>
@@ -634,12 +711,15 @@ export function BudgetGrid({
           suppressMovableColumns
           stopEditingWhenCellsLoseFocus
           singleClickEdit={false}
-          pinnedBottomRowData={[totaisMesRow]}
-          getRowStyle={(p) =>
-            p.node.rowPinned === "bottom"
-              ? { fontWeight: 700, background: "#000", color: "#fff" }
-              : undefined
-          }
+          pinnedBottomRowData={pinnedBottom}
+          getRowStyle={(p) => {
+            if (p.node.rowPinned !== "bottom") return undefined;
+            // Saldo em banco (acumulado): faixa mostarda clara
+            if (p.data?.id === -2)
+              return { fontWeight: 700, background: "#EEF0DC", color: "#3E571A" };
+            // Total geral: faixa escura
+            return { fontWeight: 700, background: "#000", color: "#fff" };
+          }}
         />
       </div>
       {modal && modal.mode === "create" && (

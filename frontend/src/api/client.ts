@@ -695,4 +695,26 @@ export const api = {
       if (error) fail(error);
     }
   },
+
+  /** Fluxo de caixa: saldo inicial do banco (único por ano, empresa). */
+  getSaldoInicial: async (ano: number): Promise<number> => {
+    const { data, error } = await supabase
+      .from("caixa_saldo_inicial")
+      .select("valor_cents")
+      .eq("ano", ano)
+      .maybeSingle();
+    // Tolerante: antes da migration (tabela inexistente) devolve 0 sem quebrar o app.
+    if (error) return 0;
+    return data ? Number((data as { valor_cents: number }).valor_cents) / 100 : 0;
+  },
+
+  setSaldoInicial: async (ano: number, valor: number): Promise<void> => {
+    const { error } = await supabase
+      .from("caixa_saldo_inicial")
+      .upsert(
+        { ano, valor_cents: toCents(valor), updated_at: new Date().toISOString() },
+        { onConflict: "ano" },
+      );
+    if (error) fail(error);
+  },
 };
