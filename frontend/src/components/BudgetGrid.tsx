@@ -25,6 +25,22 @@ import { ContaModal } from "./ContaModal";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
+// Tema do grid no padrão Sopra (papel, tinta, verde mostarda, DM Sans).
+const sopraGridTheme = themeQuartz.withParams({
+  accentColor: "#7AA436",
+  fontFamily: "'DM Sans', system-ui, sans-serif",
+  headerFontFamily: "'DM Sans', system-ui, sans-serif",
+  headerFontWeight: 500,
+  fontSize: 13,
+  backgroundColor: "#FFFFFF",
+  foregroundColor: "#22201B",
+  borderColor: "#E4DED2",
+  headerBackgroundColor: "#F7F5F0",
+  headerTextColor: "#5F594E",
+  rowHoverColor: "#F7F5F0",
+  selectedRowBackgroundColor: "#EEF0DC",
+});
+
 const MESES = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
   "Jul", "Ago", "Set", "Out", "Nov", "Dez",
@@ -609,7 +625,7 @@ export function BudgetGrid({
       </div>
       <div className="flex-1 min-h-0">
         <AgGridReact<Row>
-          theme={themeQuartz}
+          theme={sopraGridTheme}
           rowData={rows}
           columnDefs={columnDefs}
           getRowId={(p) => String(p.data.id)}

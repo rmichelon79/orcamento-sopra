@@ -7,10 +7,11 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
-  color: #1f2937;
-  background: #f9fafb;
+  font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  color: #22201b;
+  background: #f7f5f0;
+  -webkit-font-smoothing: antialiased;
 }
 
 .row-actions {
