@@ -231,7 +231,18 @@ export const api = {
     q = versao !== undefined ? q.eq("versao", versao) : q.order("versao", { ascending: false });
     const { data, error } = await q.limit(1);
     if (error) fail(error);
-    const orc = (data?.[0] as Orcamento) ?? null;
+    let orc = (data?.[0] as Orcamento) ?? null;
+    // Empreendimento novo (sem orçamento no ano): cria um rascunho v1 automaticamente.
+    // Só quando não se pediu uma versão específica (abertura padrão do app).
+    if (!orc && versao === undefined) {
+      const { data: novo, error: e2 } = await supabase
+        .from("orcamentos")
+        .insert({ empreendimento_id, ano, versao: 1, status: "rascunho" })
+        .select("*")
+        .single();
+      if (e2) fail(e2);
+      orc = (novo as Orcamento) ?? null;
+    }
     if (!orc) throw new Error("Orçamento não encontrado.");
     return orc;
   },
