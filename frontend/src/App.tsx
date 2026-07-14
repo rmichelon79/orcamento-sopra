@@ -220,6 +220,11 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col">
       <header className="border-b bg-white px-6 py-3 flex items-center gap-4">
+        <img
+          src="https://rmichelon79.github.io/sopra-portal/sopra-logo.png"
+          alt="Sopra Incorporadora"
+          className="h-6 w-auto"
+        />
         <h1 className="text-lg font-semibold text-gray-900 font-serif">Orçamento</h1>
         <EmpreendimentoSelector
           empreendimentos={empreendimentosLista}
