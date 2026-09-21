@@ -221,7 +221,7 @@ export default function App() {
     <div className="h-screen flex flex-col">
       <header className="border-b bg-white px-6 py-3 flex items-center gap-4">
         <img
-          src="https://rmichelon79.github.io/sopra-portal/sopra-logo.png"
+          src="https://portal.sopraincorporadora.com.br/sopra-logo.png"
           alt="Sopra Incorporadora"
           className="h-6 w-auto"
         />
@@ -320,7 +320,7 @@ export default function App() {
         </button>
         <button
           type="button"
-          onClick={() => { location.href = 'https://rmichelon79.github.io/sopra-portal/'; }}
+          onClick={() => { location.href = 'https://portal.sopraincorporadora.com.br/'; }}
           className="px-3 py-1.5 text-sm border rounded bg-white hover:bg-gray-50"
           title="Voltar ao Portal (continua logado)"
         >
@@ -330,7 +330,7 @@ export default function App() {
           type="button"
           onClick={async () => {
             await supabase.auth.signOut();
-            location.href = 'https://rmichelon79.github.io/sopra-portal/';
+            location.href = 'https://portal.sopraincorporadora.com.br/';
           }}
           className="px-3 py-1.5 text-sm border rounded bg-white hover:bg-gray-50 text-gray-500"
           title="Sair"

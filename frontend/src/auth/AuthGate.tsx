@@ -75,7 +75,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         <form onSubmit={entrar} className="w-[360px] bg-white rounded-xl p-8 shadow-2xl">
           <div className="text-center mb-6">
             <img
-              src="https://rmichelon79.github.io/sopra-portal/sopra-logo.png"
+              src="https://portal.sopraincorporadora.com.br/sopra-logo.png"
               alt="Sopra Incorporadora"
               className="h-8 w-auto mx-auto mb-2"
             />
